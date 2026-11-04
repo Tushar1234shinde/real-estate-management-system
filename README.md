@@ -2,6 +2,10 @@
 
 A full-stack web application designed to streamline real estate business operations, employee management, customer relationships, sales activities, property visits and attendance tracking.
 
+## Live Demo
+
+[View the application](https://real-estate-management-system-rho-ten.vercel.app/)
+
 ## Technology Stack
 
 **Frontend**
