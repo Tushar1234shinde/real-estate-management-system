@@ -1,0 +1,10 @@
+{
+  "description": "Manage real estate teams, customer assignments, property visits, attendance, and sales activity in one role-based platform for admins, executives, and field teams.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
