@@ -7,6 +7,10 @@ import { AppError } from "../errors/AppError.js";
 const MAX_EMAIL_LENGTH = 254;
 const MAX_PASSWORD_LENGTH = 1024;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INVALID_LOGIN_MESSAGE = "Invalid email or password.";
+// This fixed hash is not tied to any account. It keeps unknown-user requests on
+// the same bcrypt code path as real credential checks.
+const DUMMY_PASSWORD_HASH = "$2b$12$BdWntppJCaG2sz/DZOxzLuZ6H2dnKli.avQ2q2idjiMWIKAUuzdSi";
 
 function safeUser(user) {
     return {
@@ -43,17 +47,16 @@ export function createAuthController({ prismaClient = prisma, jwtConfig } = {}) 
                 },
             });
 
-            if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-                throw new AppError(401, "Invalid email or password.");
-            }
-
-            if (!user.isActive) {
-                throw new AppError(403, "This user account is inactive.");
+            const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+            if (!user || !user.isActive || !passwordMatches) {
+                throw new AppError(401, INVALID_LOGIN_MESSAGE);
             }
 
             const token = jwt.sign({ sub: String(user.id) }, config.secret, {
                 algorithm: "HS256",
                 expiresIn: config.expiresIn,
+                issuer: config.issuer,
+                audience: config.audience,
             });
 
             res.status(200).json({

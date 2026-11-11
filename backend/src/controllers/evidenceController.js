@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import prisma from "../config/prisma.js";
-import { createCloudinaryClient } from "../config/cloudinary.js";
+import { createCloudinaryClient, getCloudinaryEvidenceFolder } from "../config/cloudinary.js";
 import { AppError } from "../errors/AppError.js";
 import { validateEvidenceFile } from "../utils/evidence.js";
 
@@ -77,10 +77,11 @@ export function createEvidenceController({ prismaClient = prisma, cloudinaryClie
         }
 
         const client = getCloudinaryClient();
+        const evidenceFolder = getCloudinaryEvidenceFolder(environment);
         const uploaded = await uploadStream(client, req.file.buffer, {
             resource_type: resourceType,
             type: "authenticated",
-            folder: `visit-evidence/${visitId}`,
+            folder: `${evidenceFolder}/${visitId}`,
             public_id: `${kind}-${crypto.randomUUID()}`,
             overwrite: false,
         });
@@ -97,6 +98,10 @@ export function createEvidenceController({ prismaClient = prisma, cloudinaryClie
                         uploadedByUserId: req.user.id,
                         mediaType,
                         fileUrl: uploaded.secure_url,
+                        publicId: uploaded.public_id,
+                        assetId: uploaded.asset_id ?? null,
+                        resourceType: uploaded.resource_type ?? resourceType,
+                        deliveryType: uploaded.type ?? "authenticated",
                         mimeType: req.file.mimetype,
                         fileSizeBytes: BigInt(uploaded.bytes ?? req.file.size),
                         durationSeconds: Number.isFinite(uploaded.duration) ? Math.round(uploaded.duration) : null,

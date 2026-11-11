@@ -329,6 +329,10 @@ model MediaAsset {
   uploadedByUserId Int
   mediaType        MediaType
   fileUrl          String
+  publicId         String?
+  assetId          String?
+  resourceType     String?
+  deliveryType     String?
   mimeType         String?
   fileSizeBytes    BigInt?
   durationSeconds  Int?

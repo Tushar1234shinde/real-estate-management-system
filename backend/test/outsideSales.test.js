@@ -3,11 +3,23 @@ import crypto from "node:crypto";
 import { after, before, test } from "node:test";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
+import { getCloudinaryEvidenceFolder } from "../src/config/cloudinary.js";
 
 const jwtConfig = {
     secret: crypto.randomBytes(32).toString("base64url"),
     expiresIn: "1h",
+    issuer: "test-real-estate-api",
+    audience: "test-real-estate-client",
 };
+
+test("uses a production-safe default evidence folder and accepts isolated test prefixes", () => {
+    assert.equal(getCloudinaryEvidenceFolder({}), "visit-evidence");
+    assert.equal(getCloudinaryEvidenceFolder({ CLOUDINARY_EVIDENCE_FOLDER: "stage7c/unit-run" }), "stage7c/unit-run");
+    assert.throws(
+        () => getCloudinaryEvidenceFolder({ CLOUDINARY_EVIDENCE_FOLDER: "../production" }),
+        /Evidence uploads are not configured/,
+    );
+});
 
 const users = [
     { id: 1, fullName: "Admin User", email: "admin@example.com", isActive: true, role: { name: "ADMIN" } },
@@ -115,13 +127,19 @@ let failNextHistoryCreate = false;
 const mediaAssets = [];
 const visitStatusHistories = [];
 const destroyedCloudinaryAssets = [];
+const uploadedCloudinaryOptions = [];
+const signedAccessRequests = [];
 const cloudinaryClient = {
     uploader: {
         upload_stream(options, callback) {
+            uploadedCloudinaryOptions.push(options);
             return {
                 end(buffer) {
                     callback(null, {
                         public_id: options.public_id,
+                        asset_id: `asset-${options.public_id}`,
+                        resource_type: options.resource_type,
+                        type: options.type,
                         secure_url: `https://res.cloudinary.com/test/${options.public_id}`,
                         bytes: buffer.length,
                         duration: options.resource_type === "video" ? 3.2 : undefined,
@@ -129,9 +147,15 @@ const cloudinaryClient = {
                 },
             };
         },
-        async destroy(publicId) {
-            destroyedCloudinaryAssets.push(publicId);
+        async destroy(publicId, options) {
+            destroyedCloudinaryAssets.push({ publicId, options });
             return { result: "ok" };
+        },
+    },
+    utils: {
+        private_download_url(publicId, format, options) {
+            signedAccessRequests.push({ publicId, format, options });
+            return `https://example.invalid/download/${publicId}?expires_at=${options.expires_at}`;
         },
     },
 };
@@ -234,7 +258,7 @@ const prismaClient = {
     },
     mediaAsset: {
         async findFirst({ where }) {
-            return mediaAssets.find((media) => media.visitId === where.visitId && media.mediaType === where.mediaType) ?? null;
+            return mediaAssets.find((media) => Object.entries(where).every(([key, value]) => media[key] === value)) ?? null;
         },
         async create({ data }) {
             if (failNextMediaCreate) {
@@ -298,7 +322,12 @@ after(async () => {
 });
 
 function tokenFor(user) {
-    return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, { algorithm: "HS256", expiresIn: "1h" });
+    return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+    });
 }
 
 test("lists only the authenticated Outside Sales employee's schedules with pagination", async () => {
@@ -471,6 +500,11 @@ test("uploads one authenticated selfie for a passed, owned visit and returns the
     assert.equal(uploadedBody.data.created, true);
     assert.equal(uploadedBody.data.media.mediaType, "VISIT_SELFIE");
     assert.match(uploadedBody.data.media.fileUrl, /^https:/);
+    assert.match(uploadedBody.data.media.publicId, /^selfie-/);
+    assert.equal(uploadedBody.data.media.assetId, `asset-${uploadedBody.data.media.publicId}`);
+    assert.equal(uploadedBody.data.media.resourceType, "image");
+    assert.equal(uploadedBody.data.media.deliveryType, "authenticated");
+    assert.equal(uploadedCloudinaryOptions.at(-1).folder, "visit-evidence/46");
     assert.equal(duplicate.status, 200);
     assert.equal(duplicateBody.data.created, false);
     assert.equal(duplicateBody.data.media.id, uploadedBody.data.media.id);
@@ -496,6 +530,8 @@ test("uploads multiple audio recordings for a passed, owned visit", async () => 
     assert.equal(first.status, 201);
     assert.equal(second.status, 201);
     assert.equal(mediaAssets.filter((media) => media.visitId === 46 && media.mediaType === "AUDIO_RECORDING").length, 2);
+    assert.equal(mediaAssets.find((media) => media.mediaType === "AUDIO_RECORDING").resourceType, "video");
+    assert.equal(mediaAssets.find((media) => media.mediaType === "AUDIO_RECORDING").deliveryType, "authenticated");
 });
 
 test("rejects evidence uploads for unauthorized, unverified, invalid, and oversized files", async () => {
@@ -518,6 +554,8 @@ test("cleans up Cloudinary evidence when database persistence fails", async () =
 
     assert.equal(response.status, 500);
     assert.equal(destroyedCloudinaryAssets.length > 0, true);
+    assert.equal(destroyedCloudinaryAssets.at(-1).options.type, "authenticated");
+    assert.equal(destroyedCloudinaryAssets.at(-1).options.resource_type, "video");
 });
 
 function submitVisit(visitId, user) {
@@ -661,6 +699,36 @@ test("returns review details with schedule, GPS, selfie, and audio metadata", as
     assert.equal(body.data.visit.mediaAssets.filter((media) => media.mediaType === "VISIT_SELFIE").length, 1);
     assert.equal(body.data.visit.mediaAssets.filter((media) => media.mediaType === "AUDIO_RECORDING").length, 2);
     assert.equal("passwordHash" in body.data.visit.schedule.outsideSalesEmployee, false);
+});
+
+test("generates short-lived signed evidence access only for Admin and Executive users", async () => {
+    const selfie = mediaAssets.find((media) => media.visitId === 46 && media.mediaType === "VISIT_SELFIE");
+    const before = Math.floor(Date.now() / 1000);
+    const admin = await adminRequest(`/visits/46/evidence/${selfie.id}/access`, users[0]);
+    const executive = await adminRequest(`/visits/46/evidence/${selfie.id}/access`, users[3]);
+    const outside = await adminRequest(`/visits/46/evidence/${selfie.id}/access`, users[1]);
+    const missing = await adminRequest(`/visits/46/evidence/999999/access`, users[0]);
+    const adminBody = await admin.json();
+
+    assert.equal(admin.status, 200);
+    assert.equal(executive.status, 200);
+    assert.equal(outside.status, 403);
+    assert.equal(missing.status, 404);
+    assert.match(adminBody.data.accessUrl, /^https:\/\/example\.invalid\/download\//);
+    assert.ok(adminBody.data.expiresAt >= before + 299 && adminBody.data.expiresAt <= before + 301);
+    assert.equal(signedAccessRequests.at(-1).options.type, "authenticated");
+    assert.equal(signedAccessRequests.at(-1).options.resource_type, "image");
+    assert.equal(signedAccessRequests.at(-1).format, "jpg");
+});
+
+test("rejects evidence access when Cloudinary metadata or expiry configuration is invalid", async () => {
+    const incomplete = { id: nextMediaId, visitId: 46, mediaType: "OTHER", mimeType: "image/jpeg", publicId: null, resourceType: null, deliveryType: null };
+    nextMediaId += 1;
+    mediaAssets.push(incomplete);
+    const response = await adminRequest(`/visits/46/evidence/${incomplete.id}/access`, users[0]);
+
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).message, /metadata is incomplete/i);
 });
 
 test("approves and rejects pending visits while recording the reviewer", async () => {

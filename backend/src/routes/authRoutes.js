@@ -10,6 +10,8 @@ export function createAuthRouter({ prismaClient, jwtConfig, loginRateLimiter } =
     const authenticate = createAuthenticate({
         prismaClient,
         jwtSecret: jwtConfig?.secret,
+        jwtIssuer: jwtConfig?.issuer,
+        jwtAudience: jwtConfig?.audience,
     });
 
     router.post("/login", loginRateLimiter ?? createLoginRateLimiter(), asyncHandler(controller.login));

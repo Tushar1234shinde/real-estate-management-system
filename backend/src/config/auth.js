@@ -14,6 +14,8 @@ const INSECURE_JWT_SECRETS = new Set([
 export function getJwtConfig(environment = process.env) {
     const secret = environment.JWT_SECRET?.trim();
     const expiresIn = environment.JWT_EXPIRES_IN?.trim();
+    const issuer = environment.JWT_ISSUER?.trim();
+    const audience = environment.JWT_AUDIENCE?.trim();
 
     if (!secret) {
         throw new Error("JWT_SECRET must be configured.");
@@ -21,6 +23,14 @@ export function getJwtConfig(environment = process.env) {
 
     if (!expiresIn) {
         throw new Error("JWT_EXPIRES_IN must be configured.");
+    }
+
+    if (!issuer) {
+        throw new Error("JWT_ISSUER must be configured.");
+    }
+
+    if (!audience) {
+        throw new Error("JWT_AUDIENCE must be configured.");
     }
 
     if (INSECURE_JWT_SECRETS.has(secret.toLowerCase())) {
@@ -35,6 +45,8 @@ export function getJwtConfig(environment = process.env) {
         const validationToken = jwt.sign({ sub: "0" }, secret, {
             algorithm: "HS256",
             expiresIn,
+            issuer,
+            audience,
         });
         const payload = jwt.decode(validationToken);
 
@@ -49,5 +61,5 @@ export function getJwtConfig(environment = process.env) {
         throw new Error("JWT_EXPIRES_IN must be a valid positive duration.");
     }
 
-    return { secret, expiresIn };
+    return { secret, expiresIn, issuer, audience };
 }

@@ -14,8 +14,14 @@ function authenticationError(message) {
     return new AppError(401, message);
 }
 
-export function createAuthenticate({ prismaClient = prisma, jwtSecret } = {}) {
-    const secret = jwtSecret ?? getJwtConfig().secret;
+export function createAuthenticate({ prismaClient = prisma, jwtSecret, jwtIssuer, jwtAudience } = {}) {
+    const configuredJwt = jwtSecret === undefined && jwtIssuer === undefined && jwtAudience === undefined
+        ? getJwtConfig()
+        : { secret: jwtSecret, issuer: jwtIssuer, audience: jwtAudience };
+
+    if (!configuredJwt.secret || !configuredJwt.issuer || !configuredJwt.audience) {
+        throw new Error("JWT secret, issuer, and audience must be configured for authentication.");
+    }
 
     return async (req, res, next) => {
         try {
@@ -31,7 +37,11 @@ export function createAuthenticate({ prismaClient = prisma, jwtSecret } = {}) {
                 throw authenticationError("Authentication token is required.");
             }
 
-            const payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+            const payload = jwt.verify(token, configuredJwt.secret, {
+                algorithms: ["HS256"],
+                issuer: configuredJwt.issuer,
+                audience: configuredJwt.audience,
+            });
             const userId = Number(payload.sub);
 
             if (!Number.isInteger(userId) || userId <= 0) {

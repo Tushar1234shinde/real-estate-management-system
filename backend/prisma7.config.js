@@ -1,6 +1,9 @@
 
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { validateDatabaseTransport } from "./src/config/databaseSecurity.js";
+
+validateDatabaseTransport(process.env);
 
 export default defineConfig({
     schema: "prisma/schema.prisma",

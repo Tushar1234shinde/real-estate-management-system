@@ -1,9 +1,13 @@
 import prisma from "../config/prisma.js";
+import { createCloudinaryClient } from "../config/cloudinary.js";
 import { AppError } from "../errors/AppError.js";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
+const DEFAULT_EVIDENCE_ACCESS_TTL_SECONDS = 300;
+const MIN_EVIDENCE_ACCESS_TTL_SECONDS = 60;
+const MAX_EVIDENCE_ACCESS_TTL_SECONDS = 900;
 
 const reviewInclude = {
     schedule: {
@@ -30,6 +34,10 @@ const reviewInclude = {
             id: true,
             mediaType: true,
             fileUrl: true,
+            publicId: true,
+            assetId: true,
+            resourceType: true,
+            deliveryType: true,
             mimeType: true,
             fileSizeBytes: true,
             durationSeconds: true,
@@ -44,6 +52,33 @@ function parseVisitId(value) {
     const visitId = Number(value);
     if (!Number.isSafeInteger(visitId) || visitId < 1) throw new AppError(400, "visitId must be a positive integer.");
     return visitId;
+}
+
+function getEvidenceAccessTtlSeconds(environment = process.env) {
+    const value = environment.CLOUDINARY_EVIDENCE_ACCESS_TTL_SECONDS;
+    if (value === undefined || value === "") return DEFAULT_EVIDENCE_ACCESS_TTL_SECONDS;
+    if (!/^\d+$/.test(value)) throw new AppError(503, "Evidence access is not configured.");
+    const seconds = Number(value);
+    if (!Number.isSafeInteger(seconds) || seconds < MIN_EVIDENCE_ACCESS_TTL_SECONDS || seconds > MAX_EVIDENCE_ACCESS_TTL_SECONDS) {
+        throw new AppError(503, "Evidence access is not configured.");
+    }
+    return seconds;
+}
+
+function formatForMimeType(mimeType) {
+    const formats = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "audio/mpeg": "mp3",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/ogg": "ogg",
+        "audio/webm": "webm",
+        "audio/mp4": "mp4",
+        "audio/x-m4a": "m4a",
+    };
+    return formats[mimeType] ?? null;
 }
 
 function parsePositiveInteger(value, fallback, fieldName, maximum) {
@@ -74,7 +109,8 @@ function parseRejectionReason(value) {
     return reason;
 }
 
-export function createAdminVisitReviewController({ prismaClient = prisma } = {}) {
+export function createAdminVisitReviewController({ prismaClient = prisma, cloudinaryClient, environment } = {}) {
+    const getCloudinaryClient = () => cloudinaryClient ?? createCloudinaryClient(environment);
     async function decide(req, res, decision) {
         const visitId = parseVisitId(req.params.visitId);
         const rejectionReason = decision === "REJECTED" ? parseRejectionReason(req.body?.rejectionReason) : null;
@@ -133,6 +169,42 @@ export function createAdminVisitReviewController({ prismaClient = prisma } = {})
             const visit = await prismaClient.visit.findUnique({ where: { id: visitId }, include: reviewInclude });
             if (!visit) throw new AppError(404, "Visit not found.");
             return res.status(200).json({ success: true, data: { visit: serializeBigInts(visit) } });
+        },
+        getEvidenceAccessUrl: async (req, res) => {
+            const visitId = parseVisitId(req.params.visitId);
+            const mediaId = parseVisitId(req.params.mediaId);
+            const media = await prismaClient.mediaAsset.findFirst({
+                where: { id: mediaId, visitId },
+                select: {
+                    id: true,
+                    publicId: true,
+                    resourceType: true,
+                    deliveryType: true,
+                    mimeType: true,
+                },
+            });
+            if (!media) throw new AppError(404, "Evidence not found.");
+
+            const format = formatForMimeType(media.mimeType);
+            if (!media.publicId || !media.resourceType || !media.deliveryType || !format) {
+                throw new AppError(409, "Evidence access metadata is incomplete.");
+            }
+
+            const expiresAt = Math.floor(Date.now() / 1000) + getEvidenceAccessTtlSeconds(environment);
+            const client = getCloudinaryClient();
+            let accessUrl;
+            try {
+                accessUrl = client.utils.private_download_url(media.publicId, format, {
+                    resource_type: media.resourceType,
+                    type: media.deliveryType,
+                    expires_at: expiresAt,
+                });
+            } catch (error) {
+                if (error instanceof AppError) throw error;
+                throw new AppError(503, "Evidence access is not configured.");
+            }
+
+            return res.status(200).json({ success: true, data: { accessUrl, expiresAt } });
         },
         approveVisit: (req, res) => decide(req, res, "COMPLETED"),
         rejectVisit: (req, res) => decide(req, res, "REJECTED"),

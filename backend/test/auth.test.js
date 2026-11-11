@@ -7,11 +7,14 @@ import { createApp } from "../src/app.js";
 import { getJwtConfig } from "../src/config/auth.js";
 import { getCorsOptions } from "../src/config/cors.js";
 import { authorizeRoles, createAuthenticate, ROLES } from "../src/middlewares/authMiddleware.js";
+import { errorHandler } from "../src/middlewares/errorMiddleware.js";
 import { createLoginRateLimiter } from "../src/middlewares/loginRateLimitMiddleware.js";
 
 const jwtConfig = {
     secret: crypto.randomBytes(32).toString("base64url"),
     expiresIn: "1h",
+    issuer: "test-real-estate-api",
+    audience: "test-real-estate-client",
 };
 
 const passwordHash = await bcrypt.hash("correct-password", 10);
@@ -35,8 +38,17 @@ const prismaClient = {
     },
 };
 
-const authenticate = createAuthenticate({ prismaClient, jwtSecret: jwtConfig.secret });
-const app = createApp({ prismaClient, jwtConfig });
+const authenticate = createAuthenticate({
+    prismaClient,
+    jwtSecret: jwtConfig.secret,
+    jwtIssuer: jwtConfig.issuer,
+    jwtAudience: jwtConfig.audience,
+});
+const app = createApp({
+    prismaClient,
+    jwtConfig,
+    loginRateLimiter: createLoginRateLimiter({ maxAttempts: 100 }),
+});
 
 let server;
 let baseUrl;
@@ -66,7 +78,12 @@ after(async () => {
 });
 
 function tokenFor(user) {
-    return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, { expiresIn: "1h" });
+    return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+    });
 }
 
 test("logs in with valid credentials without exposing passwordHash", async () => {
@@ -80,11 +97,17 @@ test("logs in with valid credentials without exposing passwordHash", async () =>
     assert.equal(response.status, 200);
     assert.equal(body.success, true);
     assert.equal(typeof body.data.token, "string");
+    const payload = jwt.verify(body.data.token, jwtConfig.secret, {
+        algorithms: ["HS256"],
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+    });
+    assert.equal(payload.sub, "1");
     assert.deepEqual(body.data.user, { id: 1, name: "Admin User", email: "admin@example.com", role: ROLES.ADMIN });
     assert.equal(JSON.stringify(body).includes("passwordHash"), false);
 });
 
-test("rejects incorrect passwords and inactive users", async () => {
+test("returns the same generic failure for unknown, incorrect-password, and inactive accounts", async () => {
     const wrongPassword = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,14 +118,21 @@ test("rejects incorrect passwords and inactive users", async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: "inactive@example.com", password: "correct-password" }),
     });
+    const unknownUser = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "unknown@example.com", password: "wrong-password" }),
+    });
 
     assert.equal(wrongPassword.status, 401);
     assert.equal((await wrongPassword.json()).message, "Invalid email or password.");
-    assert.equal(inactiveUser.status, 403);
-    assert.equal((await inactiveUser.json()).message, "This user account is inactive.");
+    assert.equal(inactiveUser.status, 401);
+    assert.equal((await inactiveUser.json()).message, "Invalid email or password.");
+    assert.equal(unknownUser.status, 401);
+    assert.equal((await unknownUser.json()).message, "Invalid email or password.");
 });
 
-test("rejects malformed credential input and malformed JSON with HTTP 400", async () => {
+test("rejects malformed, oversized JSON request bodies with consistent client errors", async () => {
     const invalidEmail = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,17 +148,29 @@ test("rejects malformed credential input and malformed JSON with HTTP 400", asyn
         headers: { "Content-Type": "application/json" },
         body: "{",
     });
+    const oversizedJson = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "admin@example.com", password: "a".repeat(101 * 1024) }),
+    });
 
     assert.equal(invalidEmail.status, 400);
     assert.equal(oversizedPassword.status, 400);
     assert.equal(malformedJson.status, 400);
     assert.equal((await malformedJson.json()).message, "Invalid JSON request body.");
+    assert.equal(oversizedJson.status, 413);
+    assert.equal((await oversizedJson.json()).message, "Request body is too large.");
 });
 
 test("protects /api/auth/me from missing, invalid, and expired tokens", async () => {
     const missing = await fetch(`${baseUrl}/api/auth/me`);
     const invalid = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: "Bearer invalid" } });
-    const expiredToken = jwt.sign({ sub: "1" }, jwtConfig.secret, { expiresIn: "-1s" });
+    const expiredToken = jwt.sign({ sub: "1" }, jwtConfig.secret, {
+        algorithm: "HS256",
+        expiresIn: "-1s",
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+    });
     const expired = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${expiredToken}` } });
 
     assert.equal(missing.status, 401);
@@ -140,12 +182,38 @@ test("rejects JWTs signed with an algorithm other than HS256", async () => {
     const hs384Token = jwt.sign({ sub: "1" }, jwtConfig.secret, {
         algorithm: "HS384",
         expiresIn: "1h",
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
     });
     const response = await fetch(`${baseUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${hs384Token}` },
     });
 
     assert.equal(response.status, 401);
+});
+
+test("rejects tokens with missing or incorrect issuer and audience", async () => {
+    const tokenWithWrongIssuer = jwt.sign({ sub: "1" }, jwtConfig.secret, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+        issuer: "other-issuer",
+        audience: jwtConfig.audience,
+    });
+    const tokenWithWrongAudience = jwt.sign({ sub: "1" }, jwtConfig.secret, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+        issuer: jwtConfig.issuer,
+        audience: "other-audience",
+    });
+    const tokenWithoutClaims = jwt.sign({ sub: "1" }, jwtConfig.secret, { algorithm: "HS256", expiresIn: "1h" });
+
+    for (const token of [tokenWithWrongIssuer, tokenWithWrongAudience, tokenWithoutClaims]) {
+        const response = await fetch(`${baseUrl}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        assert.equal(response.status, 401);
+        assert.equal((await response.json()).message, "Authentication token is invalid.");
+    }
 });
 
 test("returns the database-backed authenticated profile from /api/auth/me", async () => {
@@ -204,17 +272,24 @@ test("validates JWT configuration and restricts CORS origins", () => {
     const validSecret = crypto.randomBytes(32).toString("base64url");
 
     assert.throws(
-        () => getJwtConfig({ JWT_SECRET: "replace-with-a-long-random-secret", JWT_EXPIRES_IN: "1h" }),
+        () => getJwtConfig({
+            JWT_SECRET: "replace-with-a-long-random-secret",
+            JWT_EXPIRES_IN: "1h",
+            JWT_ISSUER: "test-issuer",
+            JWT_AUDIENCE: "test-audience",
+        }),
         /placeholder or default/,
     );
     assert.throws(
-        () => getJwtConfig({ JWT_SECRET: "too-short", JWT_EXPIRES_IN: "1h" }),
+        () => getJwtConfig({ JWT_SECRET: "too-short", JWT_EXPIRES_IN: "1h", JWT_ISSUER: "test-issuer", JWT_AUDIENCE: "test-audience" }),
         /at least 32 bytes/,
     );
     assert.throws(
-        () => getJwtConfig({ JWT_SECRET: validSecret, JWT_EXPIRES_IN: "not-a-duration" }),
+        () => getJwtConfig({ JWT_SECRET: validSecret, JWT_EXPIRES_IN: "not-a-duration", JWT_ISSUER: "test-issuer", JWT_AUDIENCE: "test-audience" }),
         /valid positive duration/,
     );
+    assert.throws(() => getJwtConfig({ JWT_SECRET: validSecret, JWT_EXPIRES_IN: "1h" }), /JWT_ISSUER/);
+    assert.throws(() => getJwtConfig({ JWT_SECRET: validSecret, JWT_EXPIRES_IN: "1h", JWT_ISSUER: "test-issuer" }), /JWT_AUDIENCE/);
     assert.deepEqual(
         getCorsOptions({ NODE_ENV: "production", CORS_ORIGINS: "https://app.example.com, https://admin.example.com" }),
         { origin: ["https://app.example.com", "https://admin.example.com"] },
@@ -234,4 +309,45 @@ test("allows configured local CORS origins and omits CORS headers for other orig
 
     assert.equal(allowed.headers.get("access-control-allow-origin"), "http://localhost:5173");
     assert.equal(disallowed.headers.get("access-control-allow-origin"), null);
+});
+
+test("applies API security headers without exposing Express", async () => {
+    const response = await fetch(`${baseUrl}/`);
+
+    assert.equal(response.headers.get("x-powered-by"), null);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "SAMEORIGIN");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(response.headers.get("content-security-policy"), null);
+});
+
+test("logs server errors with safe structured metadata only", () => {
+    const entries = [];
+    const originalConsoleError = console.error;
+    console.error = (entry) => entries.push(entry);
+
+    try {
+        const response = {
+            headersSent: false,
+            statusCode: null,
+            body: null,
+            status(code) { this.statusCode = code; return this; },
+            json(body) { this.body = body; return this; },
+        };
+        const secretText = "Bearer sensitive-token postgresql://secret cloudinary signed-url password";
+        errorHandler(new Error(secretText), { method: "POST", path: "/api/test" }, response, assert.fail);
+
+        assert.equal(response.statusCode, 500);
+        assert.equal(response.body.message, "An unexpected error occurred.");
+        assert.equal(entries.length, 1);
+        assert.equal(entries[0].includes(secretText), false);
+        assert.deepEqual(JSON.parse(entries[0]), {
+            level: "error",
+            event: "request_failed",
+            statusCode: 500,
+            method: "POST",
+        });
+    } finally {
+        console.error = originalConsoleError;
+    }
 });

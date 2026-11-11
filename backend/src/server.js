@@ -1,12 +1,25 @@
 
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
+import prisma from "./config/prisma.js";
+import { createGracefulShutdown, registerGracefulShutdown } from "./shutdown.js";
 
-const app = createApp();
+export function startServer({
+    app = createApp(),
+    prismaClient = prisma,
+    port = process.env.PORT || 5000,
+    shutdownTimeoutMs = 10_000,
+} = {}) {
+    const server = app.listen(port, () => {
+        console.info(JSON.stringify({ level: "info", event: "server_started", port: String(port) }));
+    });
+    const shutdown = createGracefulShutdown({ server, prismaClient, timeoutMs: shutdownTimeoutMs });
+    const unregisterShutdown = registerGracefulShutdown({ shutdown });
 
-// Start server
-const PORT = process.env.PORT || 5000;
+    return { server, shutdown, unregisterShutdown };
+}
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+    startServer();
+}

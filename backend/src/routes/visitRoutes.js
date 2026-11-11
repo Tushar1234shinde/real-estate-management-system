@@ -4,11 +4,11 @@ import { createVisitSubmissionController } from "../controllers/visitSubmissionC
 import { createAuthenticate, authorizeRoles, ROLES } from "../middlewares/authMiddleware.js";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
 
-export function createVisitRouter({ prismaClient, jwtSecret } = {}) {
+export function createVisitRouter({ prismaClient, jwtSecret, jwtIssuer, jwtAudience } = {}) {
     const router = Router();
     const controller = createVisitScheduleController({ prismaClient });
     const submissionController = createVisitSubmissionController({ prismaClient });
-    const authenticate = createAuthenticate({ prismaClient, jwtSecret });
+    const authenticate = createAuthenticate({ prismaClient, jwtSecret, jwtIssuer, jwtAudience });
 
     router.post(
         "/:visitId/verify-location",

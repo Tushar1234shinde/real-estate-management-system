@@ -20,7 +20,12 @@ if (!enabled) {
     ]);
     const prisma = createIntegrationPrisma(testDatabaseUrl);
     const secondPrisma = createIntegrationPrisma(testDatabaseUrl);
-    const jwtConfig = { secret: crypto.randomBytes(32).toString("base64url"), expiresIn: "1h" };
+    const jwtConfig = {
+        secret: crypto.randomBytes(32).toString("base64url"),
+        expiresIn: "1h",
+        issuer: "integration-real-estate-api",
+        audience: "integration-real-estate-client",
+    };
     const runId = `integration-${crypto.randomUUID()}`;
     const tracked = { users: [], customers: [], properties: [], schedules: [], visits: [] };
     const roles = {};
@@ -36,6 +41,9 @@ if (!enabled) {
                     end(buffer) {
                         callback(null, {
                             public_id: options.public_id,
+                            asset_id: `asset-${options.public_id}`,
+                            resource_type: options.resource_type,
+                            type: options.type,
                             secure_url: `https://example.invalid/${options.public_id}`,
                             bytes: buffer.length,
                             duration: 1,
@@ -50,7 +58,12 @@ if (!enabled) {
     };
 
     function tokenFor(user) {
-        return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, { algorithm: "HS256", expiresIn: "1h" });
+        return jwt.sign({ sub: String(user.id) }, jwtConfig.secret, {
+            algorithm: "HS256",
+            expiresIn: "1h",
+            issuer: jwtConfig.issuer,
+            audience: jwtConfig.audience,
+        });
     }
 
     async function start(app) {
@@ -259,6 +272,11 @@ if (!enabled) {
         ]);
         assert.deepEqual(responses.map((response) => response.status).sort(), [200, 201]);
         assert.equal(await prisma.mediaAsset.count({ where: { visitId: data.visit.id, mediaType: "VISIT_SELFIE" } }), 1);
+        const selfie = await prisma.mediaAsset.findFirst({ where: { visitId: data.visit.id, mediaType: "VISIT_SELFIE" } });
+        assert.match(selfie.publicId, /^selfie-/);
+        assert.equal(selfie.assetId, `asset-${selfie.publicId}`);
+        assert.equal(selfie.resourceType, "image");
+        assert.equal(selfie.deliveryType, "authenticated");
     });
 
     test("persists the complete visit workflow through Admin review", async () => {
