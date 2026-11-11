@@ -5,7 +5,8 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/auth.test.js test/outsideSales.test.js",
+    "test:integration": "node scripts/run-integration-tests.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:seed": "prisma db seed"
