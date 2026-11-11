@@ -58,12 +58,21 @@ enum VisitScheduleStatus {
 
 enum VisitStatus {
   IN_PROGRESS
+  PENDING_REVIEW
   COMPLETED
+  REJECTED
   CANCELLED
+}
+
+enum VisitVerificationResult {
+  PENDING
+  PASSED
+  FAILED
 }
 
 enum MediaType {
   AUDIO_RECORDING
+  VISIT_SELFIE
   CUSTOMER_SELFIE
   OTHER
 }
@@ -135,8 +144,10 @@ model User {
   outsideSalesSchedules VisitSchedule[] @relation("OutsideSalesSchedule")
   schedulesCreated      VisitSchedule[] @relation("ScheduleCreatedBy")
 
-  uploadedMedia     MediaAsset[]
-  uploadedDocuments PropertyDocument[]
+  uploadedMedia      MediaAsset[]
+  uploadedDocuments  PropertyDocument[]
+  reviewedVisits     Visit[]              @relation("VisitReviewedBy")
+  visitStatusChanges VisitStatusHistory[] @relation("VisitStatusChangedBy")
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -191,12 +202,15 @@ model CustomerAssignment {
 // -------------------- PROPERTIES --------------------
 
 model Property {
-  id          Int            @id @default(autoincrement())
-  title       String
-  description String?
-  location    String
-  price       Decimal        @db.Decimal(12, 2)
-  status      PropertyStatus @default(AVAILABLE)
+  id                       Int            @id @default(autoincrement())
+  title                    String
+  description              String?
+  location                 String
+  latitude                 Float?
+  longitude                Float?
+  verificationRadiusMeters Int            @default(200)
+  price                    Decimal        @db.Decimal(12, 2)
+  status                   PropertyStatus @default(AVAILABLE)
 
   documents      PropertyDocument[]
   calls          CallLog[]
@@ -283,17 +297,27 @@ model VisitSchedule {
 // -------------------- VISITS --------------------
 
 model Visit {
-  id               Int         @id @default(autoincrement())
-  scheduleId       Int         @unique
-  reachedAt        DateTime?   @db.Timestamptz(3)
-  completedAt      DateTime?   @db.Timestamptz(3)
-  status           VisitStatus @default(IN_PROGRESS)
-  reachedLatitude  Float?
-  reachedLongitude Float?
+  id                         Int                     @id @default(autoincrement())
+  scheduleId                 Int                     @unique
+  // Coordinates captured for the property-location verification attempt.
+  reachedAt                  DateTime?               @db.Timestamptz(3)
+  completedAt                DateTime?               @db.Timestamptz(3)
+  status                     VisitStatus             @default(IN_PROGRESS)
+  reachedLatitude            Float?
+  reachedLongitude           Float?
+  verificationResult         VisitVerificationResult @default(PENDING)
+  verificationCheckedAt      DateTime?               @db.Timestamptz(3)
+  verificationDistanceMeters Float?
+  reviewerId                 Int?
+  reviewedAt                 DateTime?               @db.Timestamptz(3)
+  rejectionReason            String?
 
-  schedule    VisitSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
-  mediaAssets MediaAsset[]
+  schedule      VisitSchedule        @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  mediaAssets   MediaAsset[]
+  reviewer      User?                @relation("VisitReviewedBy", fields: [reviewerId], references: [id], onDelete: Restrict)
+  statusHistory VisitStatusHistory[]
 
+  @@index([reviewerId])
   @@map("visits")
 }
 
@@ -316,6 +340,23 @@ model MediaAsset {
   @@index([visitId, mediaType])
   @@index([uploadedByUserId])
   @@map("media_assets")
+}
+
+model VisitStatusHistory {
+  id              Int          @id @default(autoincrement())
+  visitId         Int
+  previousStatus  VisitStatus?
+  newStatus       VisitStatus
+  changedByUserId Int
+  reason          String?
+  changedAt       DateTime     @default(now()) @db.Timestamptz(3)
+
+  visit         Visit @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  changedByUser User  @relation("VisitStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([visitId, changedAt])
+  @@index([changedByUserId])
+  @@map("visit_status_history")
 }
 
 // -------------------- OFFICE & ATTENDANCE --------------------

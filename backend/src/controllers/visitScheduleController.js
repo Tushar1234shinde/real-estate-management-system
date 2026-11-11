@@ -1,0 +1,215 @@
+import prisma from "../config/prisma.js";
+import { AppError } from "../errors/AppError.js";
+import { calculateHaversineDistanceMeters, validateLocationPayload } from "../utils/location.js";
+
+const visitSelect = {
+    id: true,
+    scheduleId: true,
+    status: true,
+    reachedLatitude: true,
+    reachedLongitude: true,
+    reachedAt: true,
+    completedAt: true,
+    verificationResult: true,
+    verificationCheckedAt: true,
+    verificationDistanceMeters: true,
+};
+
+function parseScheduleId(value) {
+    if (!/^\d+$/.test(value ?? "")) {
+        throw new AppError(400, "scheduleId must be a positive integer.");
+    }
+
+    const scheduleId = Number(value);
+
+    if (!Number.isSafeInteger(scheduleId) || scheduleId < 1) {
+        throw new AppError(400, "scheduleId must be a positive integer.");
+    }
+
+    return scheduleId;
+}
+
+function parseVisitId(value) {
+    if (!/^\d+$/.test(value ?? "")) {
+        throw new AppError(400, "visitId must be a positive integer.");
+    }
+
+    const visitId = Number(value);
+
+    if (!Number.isSafeInteger(visitId) || visitId < 1) {
+        throw new AppError(400, "visitId must be a positive integer.");
+    }
+
+    return visitId;
+}
+
+function isUniqueConstraintError(error) {
+    return error?.code === "P2002";
+}
+
+export function createVisitScheduleController({ prismaClient = prisma } = {}) {
+    return {
+        initializeVisit: async (req, res) => {
+            const scheduleId = parseScheduleId(req.params.scheduleId);
+            const schedule = await prismaClient.visitSchedule.findUnique({
+                where: { id: scheduleId },
+                select: {
+                    id: true,
+                    outsideSalesEmployeeId: true,
+                    visit: { select: visitSelect },
+                },
+            });
+
+            if (!schedule) {
+                throw new AppError(404, "Visit schedule not found.");
+            }
+
+            if (schedule.outsideSalesEmployeeId !== req.user.id) {
+                throw new AppError(403, "You do not have permission to access this visit schedule.");
+            }
+
+            if (schedule.visit) {
+                return res.status(200).json({
+                    success: true,
+                    data: {
+                        visit: schedule.visit,
+                        created: false,
+                    },
+                });
+            }
+
+            try {
+                const visit = await prismaClient.visit.create({
+                    data: { scheduleId },
+                    select: visitSelect,
+                });
+
+                return res.status(201).json({
+                    success: true,
+                    data: {
+                        visit,
+                        created: true,
+                    },
+                });
+            } catch (error) {
+                if (!isUniqueConstraintError(error)) {
+                    throw error;
+                }
+
+                const existingVisit = await prismaClient.visit.findUnique({
+                    where: { scheduleId },
+                    select: visitSelect,
+                });
+
+                if (!existingVisit) {
+                    throw error;
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    data: {
+                        visit: existingVisit,
+                        created: false,
+                    },
+                });
+            }
+        },
+        verifyLocation: async (req, res) => {
+            const visitId = parseVisitId(req.params.visitId);
+            const visit = await prismaClient.visit.findUnique({
+                where: { id: visitId },
+                select: {
+                    ...visitSelect,
+                    schedule: {
+                        select: {
+                            outsideSalesEmployeeId: true,
+                            property: {
+                                select: {
+                                    latitude: true,
+                                    longitude: true,
+                                    verificationRadiusMeters: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+
+            if (!visit) {
+                throw new AppError(404, "Visit not found.");
+            }
+
+            if (visit.schedule.outsideSalesEmployeeId !== req.user.id) {
+                throw new AppError(403, "You do not have permission to access this visit.");
+            }
+
+            if (visit.verificationCheckedAt || visit.verificationResult !== "PENDING") {
+                return res.status(200).json({
+                    success: true,
+                    data: { visit, verified: false },
+                });
+            }
+
+            if (visit.status !== "IN_PROGRESS") {
+                throw new AppError(409, "This visit can no longer be verified.");
+            }
+
+            const location = validateLocationPayload(req.body);
+
+            const { property } = visit.schedule;
+
+            if (property.latitude === null || property.longitude === null) {
+                throw new AppError(422, "Property coordinates are not configured for this visit.");
+            }
+
+            const distance = calculateHaversineDistanceMeters(
+                location.latitude,
+                location.longitude,
+                property.latitude,
+                property.longitude,
+            );
+            const verificationResult = distance <= property.verificationRadiusMeters ? "PASSED" : "FAILED";
+            const update = await prismaClient.visit.updateMany({
+                where: {
+                    id: visitId,
+                    status: "IN_PROGRESS",
+                    verificationResult: "PENDING",
+                    verificationCheckedAt: null,
+                },
+                data: {
+                    reachedLatitude: location.latitude,
+                    reachedLongitude: location.longitude,
+                    verificationDistanceMeters: distance,
+                    verificationResult,
+                    verificationCheckedAt: new Date(),
+                },
+            });
+
+            if (update.count === 0) {
+                const existingVisit = await prismaClient.visit.findUnique({
+                    where: { id: visitId },
+                    select: visitSelect,
+                });
+
+                if (!existingVisit) {
+                    throw new AppError(404, "Visit not found.");
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    data: { visit: existingVisit, verified: false },
+                });
+            }
+
+            const verifiedVisit = await prismaClient.visit.findUnique({
+                where: { id: visitId },
+                select: visitSelect,
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: { visit: verifiedVisit, verified: true },
+            });
+        },
+    };
+}
