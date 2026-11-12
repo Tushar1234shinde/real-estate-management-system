@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { NavLink, useNavigate, useParams } from "react-router"
+import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
+import AdminExecutiveWorkspace from "./AdminExecutiveWorkspace.jsx"
 
 import {
   ArrowLeft,
@@ -49,20 +51,9 @@ import {
   maskPhone,
   propertyOptions,
   roleNames,
-  routeRoleValues,
 } from "../data/mockData.js"
 
 const STORAGE_KEY = "proptide-demo-data-v2"
-
-const demoRoleLabels = {
-  admin: "Admin",
-
-  executive: "Executive",
-
-  "inside-sales": "Inside Sales",
-
-  "outside-sales": "Outside Sales",
-}
 
 const navByRole = {
   admin: [
@@ -237,7 +228,7 @@ function Sidebar({ role, employee, open, onClose }) {
   )
 }
 
-function Header({ role, employee, onOpenSidebar, onRoleChange, onSearch }) {
+function Header({ role, employee, onOpenSidebar, onLogout, onSearch }) {
   const [notifications, setNotifications] = useState(false)
 
   return (
@@ -257,19 +248,7 @@ function Header({ role, employee, onOpenSidebar, onRoleChange, onSearch }) {
         />
       </label>
       <div className="top-actions">
-        <label className="role-switcher">
-          <span>Demo role</span>
-          <select
-            value={role}
-            onChange={(event) => onRoleChange(event.target.value)}
-          >
-            {Object.entries(roleNames).map(([key, value]) => (
-              <option value={key} key={key}>
-                {demoRoleLabels[key] || value}
-              </option>
-            ))}
-          </select>
-        </label>
+        <button className="text-button" onClick={onLogout}>Log out</button>
         <button
           className="icon-button notification-button"
           onClick={() => setNotifications((value) => !value)}
@@ -2404,12 +2383,13 @@ function Modal({
   )
 }
 
-function Dashboard() {
+function LegacyDashboard() {
   const params = useParams()
 
   const navigate = useNavigate()
+  const { user, signOut } = useAuth()
 
-  const role = roleNames[params.role] ? params.role : "admin"
+  const role = roleRoute(user?.role)
 
   const section = params.section || "overview"
 
@@ -2468,16 +2448,10 @@ function Dashboard() {
   }, [data, loaded])
 
   useEffect(() => {
-    if (!roleNames[params.role]) {
-      navigate("/app/admin/overview", { replace: true })
-
-      return
-    }
-
     if (!navByRole[role].some(([id]) => id === section)) {
       navigate(`/app/${role}/overview`, { replace: true })
     }
-  }, [navigate, params.role, role, section])
+  }, [navigate, role, section])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -2487,9 +2461,14 @@ function Dashboard() {
     return () => window.clearTimeout(timeout)
   }, [toast])
 
-  const employee = data.employees.find(
-    (item) => item.role === routeRoleValues[role] && item.status === "Active",
-  )
+  const employee = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: "Active",
+    employeeId: `Employee ${user.id}`,
+  }
 
   function showMessage(message) {
     setToast(message)
@@ -3055,10 +3034,9 @@ function Dashboard() {
           role={role}
           employee={employee}
           onOpenSidebar={() => setSidebar(true)}
-          onRoleChange={(nextRole) => {
-            setGlobalSearch("")
-
-            navigate(`/app/${nextRole}/overview`)
+          onLogout={() => {
+            signOut()
+            navigate("/", { replace: true })
           }}
           onSearch={(value) => {
             setGlobalSearch(value)
@@ -3144,6 +3122,16 @@ function Dashboard() {
       )}
     </div>
   )
+}
+
+function Dashboard() {
+  const { user } = useAuth()
+
+  if (user?.role === "ADMIN" || user?.role === "EXECUTIVE") {
+    return <AdminExecutiveWorkspace />
+  }
+
+  return <LegacyDashboard />
 }
 
 export default Dashboard

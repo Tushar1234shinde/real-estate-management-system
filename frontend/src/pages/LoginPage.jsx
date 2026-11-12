@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { useNavigate } from "react-router"
+import { Navigate, useNavigate } from "react-router"
+import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
 import {
   Building2,
   Eye,
@@ -9,33 +10,50 @@ import {
   Check,
 } from "lucide-react"
 
-const roles = [
-  { id: "admin", label: "Admin" },
-  { id: "executive", label: "Executive" },
-  { id: "inside-sales", label: "Inside Sales" },
-  { id: "outside-sales", label: "Outside Sales" },
-]
-
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { status, user, signIn } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
-  const [role, setRole] = useState("admin")
   const [errors, setErrors] = useState({})
   const [notice, setNotice] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  function login(event) {
+  async function login(event) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const nextErrors = {}
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.get("email") || ""))
+    const email = String(form.get("email") || "").trim()
+    const password = String(form.get("password") || "")
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       nextErrors.email = "Enter a valid work email"
-    if ((form.get("password") || "").length < 6)
+    if (password.length < 6)
       nextErrors.password = "Password must be at least 6 characters"
     setErrors(nextErrors)
-    if (!Object.keys(nextErrors).length) {
-      setNotice("")
-      navigate(`/app/${role}/overview`)
+    if (Object.keys(nextErrors).length) return
+
+    setNotice("")
+    setSubmitting(true)
+    try {
+      const authenticatedUser = await signIn({ email, password })
+      const route = roleRoute(authenticatedUser.role)
+      if (!route) {
+        setNotice("Your account does not have access to a workspace.")
+        return
+      }
+      navigate(`/app/${route}/overview`, { replace: true })
+    } catch (error) {
+      setNotice(error.message || "Unable to sign in. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
+  }
+
+  if (status === "loading") {
+    return <main className="auth-state">Checking your session…</main>
+  }
+
+  if (status === "authenticated" && roleRoute(user?.role)) {
+    return <Navigate to={`/app/${roleRoute(user.role)}/overview`} replace />
   }
 
   return (
@@ -63,7 +81,7 @@ export default function LoginPage() {
               <Check /> Clear field visit workflows
             </span>
             <span>
-              <Check /> Role-based demo views
+              <Check /> Role-based workspaces
             </span>
           </div>
         </div>
@@ -81,10 +99,10 @@ export default function LoginPage() {
             Proptide
           </div>
           <span className="eyebrow">WELCOME BACK</span>
-          <h2>Open your demo workspace</h2>
+          <h2>Open your workspace</h2>
           <p className="muted">
-            Choose a role to preview its workflow. Credentials are not
-            authenticated.
+            Sign in with your work credentials to access your assigned
+            workspace.
           </p>
           <form onSubmit={login} noValidate>
             <label className="field-label">
@@ -93,7 +111,7 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 placeholder="name@proptide.com"
-                defaultValue="admin@proptide.com"
+                autoComplete="email"
               />
               {errors.email && (
                 <small className="field-error">{errors.email}</small>
@@ -106,7 +124,7 @@ export default function LoginPage() {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
-                  defaultValue="proptide2025"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -120,19 +138,6 @@ export default function LoginPage() {
                 <small className="field-error">{errors.password}</small>
               )}
             </label>
-            <label className="field-label">
-              Demo role
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value)}
-              >
-                {roles.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <div className="login-options">
               <span className="muted">
                 Demo mode · no credentials are checked
@@ -142,15 +147,15 @@ export default function LoginPage() {
                 className="text-button"
                 onClick={() =>
                   setNotice(
-                    "Password reset is not available in this frontend demo.",
+                    "Password reset is not available in this application.",
                   )
                 }
               >
                 Forgot password?
               </button>
             </div>
-            <button className="primary-button login-button">
-              Open demo dashboard <ArrowRight size={18} />
+            <button className="primary-button login-button" disabled={submitting}>
+              {submitting ? "Signing in…" : "Sign in"} <ArrowRight size={18} />
             </button>
           </form>
           <div className="secure-note">
