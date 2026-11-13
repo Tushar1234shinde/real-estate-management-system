@@ -12,4 +12,9 @@ export const insideSalesApi = {
   updateVisitSchedule: (scheduleId, body, options) => apiRequest(`/api/inside-sales/visit-schedules/${scheduleId}`, { method: "PATCH", body, ...options }),
   getDashboard: (options) => apiRequest("/api/inside-sales/dashboard", options),
   getProfile: (options) => apiRequest("/api/inside-sales/profile", options),
+  listDocuments: (propertyId, query, options) => apiRequest(`/api/inside-sales/properties/${propertyId}/documents`, { query, ...options }),
+  getDocumentAccess: (propertyId, documentId, options) => apiRequest(`/api/inside-sales/properties/${propertyId}/documents/${documentId}/access`, options),
+  sendWhatsAppMessage: (customerId, body, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-messages`, { method: "POST", body, ...options }),
+  listWhatsAppMessages: (customerId, query, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-messages`, { query, ...options }),
+  recordWhatsAppConsent: (customerId, body, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-consent`, { method: "PATCH", body, ...options }),
 }

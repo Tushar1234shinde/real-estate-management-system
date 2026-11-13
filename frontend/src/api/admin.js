@@ -19,4 +19,13 @@ export const adminApi = {
   getEvidenceAccess: (visitId, mediaId, options) => apiRequest(`/api/admin/visits/${visitId}/evidence/${mediaId}/access`, options),
   approveVisit: (visitId, options) => apiRequest(`/api/admin/visits/${visitId}/approve`, { method: "PATCH", ...options }),
   rejectVisit: (visitId, rejectionReason, options) => apiRequest(`/api/admin/visits/${visitId}/reject`, { method: "PATCH", body: { rejectionReason }, ...options }),
+  listDocuments: (propertyId, query, options) => apiRequest(`/api/admin/properties/${propertyId}/documents`, { query, ...options }),
+  uploadDocuments: (propertyId, formData, options) => apiRequest(`/api/admin/properties/${propertyId}/documents`, { method: "POST", body: formData, ...options }),
+  getDocumentAccess: (propertyId, documentId, options) => apiRequest(`/api/admin/properties/${propertyId}/documents/${documentId}/access`, options),
+  deleteDocument: (propertyId, documentId, options) => apiRequest(`/api/admin/properties/${propertyId}/documents/${documentId}`, { method: "DELETE", ...options }),
+  listCallLogs: (query, options) => apiRequest("/api/admin/call-logs", { query, ...options }),
+  getCallLogStatistics: (query, options) => apiRequest("/api/admin/call-logs/statistics", { query, ...options }),
+  sendWhatsAppMessage: (customerId, body, options) => apiRequest(`/api/admin/customers/${customerId}/whatsapp-messages`, { method: "POST", body, ...options }),
+  listWhatsAppMessages: (customerId, query, options) => apiRequest(`/api/admin/customers/${customerId}/whatsapp-messages`, { query, ...options }),
+  recordWhatsAppConsent: (customerId, body, options) => apiRequest(`/api/admin/customers/${customerId}/whatsapp-consent`, { method: "PATCH", body, ...options }),
 }

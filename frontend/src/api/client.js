@@ -34,9 +34,73 @@ async function readResponse(response) {
   }
 }
 
-export async function apiRequest(path, { method = "GET", query, body, headers = {}, signal } = {}) {
+export async function apiRequest(path, { method = "GET", query, body, headers = {}, signal, onUploadProgress } = {}) {
   const token = getAuthToken()
   const isFormData = body instanceof FormData
+  const url = createUrl(path, query)
+
+  // Use XMLHttpRequest when upload progress tracking is needed (fetch doesn't support it)
+  if (onUploadProgress && isFormData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open(method, url.toString())
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
+      Object.entries(headers).forEach(([key, value]) => {
+        xhr.setRequestHeader(key, value)
+      })
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          onUploadProgress(event)
+        }
+      })
+
+      xhr.addEventListener("load", () => {
+        const contentType = xhr.getResponseHeader("content-type") || ""
+        let payload = null
+        if (contentType.includes("application/json")) {
+          try { payload = JSON.parse(xhr.responseText) } catch { payload = null }
+        }
+
+        if (!xhr.ok || (payload && payload.success === false)) {
+          if (xhr.status === 401) {
+            clearAuthToken()
+            window.dispatchEvent(new Event("auth:unauthorized"))
+          }
+          reject(new ApiError(payload?.message || "The API request failed.", {
+            status: xhr.status,
+            data: payload,
+          }))
+          return
+        }
+
+        if (!payload || payload.success !== true) {
+          reject(new ApiError("The API returned an unexpected response.", {
+            status: xhr.status,
+            data: payload,
+          }))
+          return
+        }
+
+        resolve(payload.data)
+      })
+
+      xhr.addEventListener("error", () => {
+        reject(new ApiError("Unable to connect to the API."))
+      })
+
+      xhr.addEventListener("abort", () => {
+        reject(new ApiError("Request aborted."))
+      })
+
+      if (signal) {
+        signal.addEventListener("abort", () => xhr.abort())
+      }
+
+      xhr.send(body)
+    })
+  }
+
   const requestHeaders = new Headers(headers)
 
   if (token) requestHeaders.set("Authorization", `Bearer ${token}`)
@@ -46,7 +110,7 @@ export async function apiRequest(path, { method = "GET", query, body, headers = 
 
   let response
   try {
-    response = await fetch(createUrl(path, query), {
+    response = await fetch(url, {
       method,
       headers: requestHeaders,
       body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),

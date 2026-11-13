@@ -3,6 +3,15 @@ import { useEffect, useMemo, useState } from "react"
 import { NavLink, useNavigate, useParams } from "react-router"
 import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
 import AdminExecutiveWorkspace from "./AdminExecutiveWorkspace.jsx"
+import { EmployeeAttendance } from "../components/EmployeeAttendance.jsx"
+import { AdminAttendance } from "../components/AdminAttendance.jsx"
+import { AnnouncementList } from "../components/AnnouncementList.jsx"
+import { AnnouncementDetail } from "../components/AnnouncementDetail.jsx"
+import { AnnouncementForm } from "../components/AnnouncementForm.jsx"
+import { AnnouncementStats } from "../components/AnnouncementStats.jsx"
+import { CustomerCallLogs } from "../components/CustomerCallLogs.jsx"
+import { CustomerWhatsApp } from "../components/CustomerWhatsApp.jsx"
+import { AdminCallLogs } from "../components/AdminCallLogs.jsx"
 
 import {
   ArrowLeft,
@@ -87,6 +96,8 @@ const navByRole = {
     ["add-customer", "Add Customer", Plus],
 
     ["assignments", "Assign Customer", UserCheck],
+
+    ["announcements", "Announcements", Megaphone],
   ],
 
   "inside-sales": [
@@ -100,6 +111,9 @@ const navByRole = {
     ["visits", "Property Visits", CalendarDays],
     ["calls", "Call Outcomes", Phone],
     ["assignments", "Outside Sales Assignments", UserCheck],
+    ["attendance", "Attendance", Clock3],
+
+    ["announcements", "Announcements", Megaphone],
 
     ["profile", "My Profile", Users],
   ],
@@ -110,6 +124,8 @@ const navByRole = {
     ["customers", "Assigned Customers", Contact],
 
     ["visits", "Visit History", CalendarDays],
+    ["announcements", "Announcements", Megaphone],
+    ["attendance", "Attendance", Clock3],
 
     ["profile", "My Profile", Users],
   ],
@@ -1093,22 +1109,42 @@ function ModulePage({
   }
 
   if (section === "announcements") {
-    return (
-      <Announcements
-        announcements={data.announcements}
-        onCreate={() => onOpenModal("announcement")}
-      />
-    )
+    return <AnnouncementPage />
+  }
+
+  if (section === "attendance") {
+    if (role === "admin") {
+      return <AdminAttendance />
+    }
+    return <EmployeeAttendance />
   }
 
   if (section === "settings") {
     return <SettingsPage />
   }
   if (section === "calls") {
-    const calls = data.calls.filter(
-      (call) => role !== "inside-sales" || call.employeeId === employee?.id,
+    if (role === "admin" || role === "executive") {
+      return <AdminCallLogs role={role === "admin" ? "ADMIN" : "EXECUTIVE"} />
+    }
+    return (
+      <>
+        <PageHeading
+          eyebrow={roleNames[role].toUpperCase()}
+          title="Call Logs"
+          subtitle="View and add call logs for your assigned customers from their details page."
+        />
+        <div className="hint-card">
+          <Phone />
+          <div>
+            <strong>Call logs are tracked per customer.</strong>
+            <p>
+              Open a customer from the Assigned Customers list to view their
+              call history and add new call logs.
+            </p>
+          </div>
+        </div>
+      </>
     )
-    return <CallRecordsPage calls={calls} data={data} role={role} />
   }
   if (section === "visits") {
     const visits = data.visits.filter((visit) => {
@@ -1591,6 +1627,19 @@ function CustomerDrawer({
             <p className="muted">No property visit has been scheduled.</p>
           )}
         </div>
+        <div className="drawer-section">
+          <h4>Call logs</h4>
+          <CustomerCallLogs
+            customerId={customer.id}
+            role={role === "inside-sales" ? "INSIDE_SALES" : "OUTSIDE_SALES"}
+          />
+        </div>
+        {role === "inside-sales" && (
+          <div className="drawer-section">
+            <h4>WhatsApp messages</h4>
+            <CustomerWhatsApp customerId={customer.id} role={role} />
+          </div>
+        )}
         {(canManage || canAssignInside) && (
           <div className="drawer-actions">
             {canAssignInside && (
@@ -1890,53 +1939,6 @@ function CallRecordsPage({ calls, data, role }) {
   )
 }
 
-function Announcements({ announcements, onCreate }) {
-  return (
-    <>
-      <PageHeading
-        eyebrow="TEAM COMMUNICATION"
-        title="Announcements"
-        subtitle="Create and review local demo notices. Delivery is not connected."
-      >
-        <button className="primary-button" onClick={onCreate}>
-          <Plus /> New announcement
-        </button>
-      </PageHeading>
-      <div className="announcement-layout">
-        <section className="card">
-          {announcements.map((item) => (
-            <article className="announcement" key={item.id}>
-              <div className="announce-icon">
-                <Megaphone />
-              </div>
-              <div>
-                <div className="announcement-title">
-                  <h3>{item.title}</h3>
-                  <span>{item.audience}</span>
-                </div>
-                <p>{item.message}</p>
-                <small>
-                  Saved locally · {new Date(item.createdAt).toLocaleString()}
-                </small>
-              </div>
-            </article>
-          ))}
-          {!announcements.length && <EmptyState title="No announcements yet" />}
-        </section>
-        <aside className="card announcement-tip">
-          <span>
-            <Megaphone />
-          </span>
-          <h3>Local demo notices</h3>
-          <p>
-            Messages stay in this browser and are not delivered to employees.
-          </p>
-        </aside>
-      </div>
-    </>
-  )
-}
-
 function SettingsPage() {
   return (
     <>
@@ -2140,32 +2142,7 @@ function Modal({
             </>
           ) : (
             <div className="modal-grid">
-              {type === "announcement" ? (
-                <>
-                  <label className="field-label full">
-                    Title *
-                    <input name="title" required maxLength="100" />
-                  </label>
-                  <label className="field-label full">
-                    Message *
-                    <textarea
-                      name="message"
-                      required
-                      rows="4"
-                      maxLength="1000"
-                    />
-                  </label>
-                  <label className="field-label full">
-                    Audience
-                    <select name="audience" defaultValue="All employees">
-                      <option>All employees</option>
-                      <option>Inside Sales</option>
-                      <option>Outside Sales</option>
-                      <option>Executives</option>
-                    </select>
-                  </label>
-                </>
-              ) : type === "employee" ? (
+              {type === "employee" ? (
                 <>
                   <label className="field-label full">
                     Employee name *
@@ -2780,32 +2757,6 @@ function LegacyDashboard() {
       setModal(null)
 
       showMessage(`Visit scheduled for ${customer.name}.`)
-
-      return ""
-    }
-
-    if (type === "announcement") {
-      const announcement = {
-        id: createId("announcement"),
-
-        title: String(values.title || "").trim(),
-
-        message: String(values.message || "").trim(),
-
-        audience: values.audience || "All employees",
-
-        createdAt: new Date().toISOString(),
-      }
-
-      setData((current) => ({
-        ...current,
-
-        announcements: [announcement, ...current.announcements],
-      }))
-
-      setModal(null)
-
-      showMessage("Announcement saved locally. No employees were notified.")
 
       return ""
     }
