@@ -376,6 +376,8 @@ test("lists only the authenticated Outside Sales employee's schedules with pagin
     assert.equal(body.data.schedules.length, 1);
     assert.equal(body.data.schedules[0].id, 101);
     assert.equal(body.data.schedules[0].customer.id, 11);
+    assert.equal(body.data.schedules[0].customer.phone, "****1111");
+    assert.equal(JSON.stringify(body).includes("\"1111111111\""), false);
     assert.equal(body.data.schedules[0].property.id, 21);
     assert.deepEqual(body.data.pagination, { page: 1, pageSize: 1, total: 10, totalPages: 10 });
 });

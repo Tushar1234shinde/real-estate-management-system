@@ -183,7 +183,23 @@ test("lists only customers assigned to the authenticated inside-sales employee",
 
     assert.equal(response.status, 200);
     assert.deepEqual(body.data.customers.map((customer) => customer.id), [11]);
+    assert.equal(body.data.customers[0].phone, "****1111");
+    assert.equal(JSON.stringify(body).includes("\"1111111111\""), false);
     assert.deepEqual(body.data.pagination, { page: 1, pageSize: 1, total: 1, totalPages: 1 });
+});
+
+test("masks customer phone numbers in assigned-customer detail and interest responses", async () => {
+    const detail = await request("/customers/11", users[0]);
+    const updated = await request("/customers/11/interest", users[0], {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interestStatus: "INTERESTED" }),
+    });
+
+    assert.equal(detail.status, 200);
+    assert.equal((await detail.json()).data.customer.phone, "****1111");
+    assert.equal(updated.status, 200);
+    assert.equal((await updated.json()).data.customer.phone, "****1111");
 });
 
 test("rejects non-inside-sales roles and invalid pagination", async () => {

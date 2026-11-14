@@ -7,7 +7,7 @@ function response() {
 }
 
 const user = { id: 7, role: "INSIDE_SALES" };
-const office = { id: 3, officeName: "HQ", address: "Main Street" };
+const office = { id: 3, officeName: "HQ", address: "Main Street", latitude: 12.9, longitude: 77.5, allowedRadiusMeters: 200 };
 function record(overrides = {}) {
     return { id: 11, employeeId: user.id, officeLocationId: office.id, loginTime: new Date("2026-11-12T09:00:00.000Z"), logoutTime: null, loginLatitude: 12.9, loginLongitude: 77.5, logoutLatitude: null, logoutLongitude: null, status: "LOGGED_IN", logoutReason: null, employee: { id: 7, fullName: "Ada", email: "ada@example.test", role: { name: "INSIDE_SALES" } }, officeLocation: office, ...overrides };
 }
@@ -38,7 +38,28 @@ test("check-in rejects spoofed employee IDs, bad coordinates, and duplicate sess
     });
     await assert.rejects(() => controller.checkIn({ user, body: { employeeId: 99, latitude: 12, longitude: 77, officeLocationId: 3 } }, response()), { statusCode: 400 });
     await assert.rejects(() => controller.checkIn({ user, body: { latitude: 91, longitude: 77, officeLocationId: 3 } }, response()), { statusCode: 400 });
-    await assert.rejects(() => controller.checkIn({ user, body: { latitude: 12, longitude: 77, officeLocationId: 3 } }, response()), { statusCode: 409 });
+    await assert.rejects(() => controller.checkIn({ user, body: { latitude: 12.9, longitude: 77.5, officeLocationId: 3 } }, response()), { statusCode: 409 });
+});
+
+test("check-in enforces the configured office geofence before creating attendance", async () => {
+    let created = false;
+    const controller = createAttendanceController({
+        prismaClient: {
+            officeLocation: { findFirst: async () => office },
+            attendance: { create: async () => { created = true; return record(); } },
+        },
+    });
+
+    const withinOffice = response();
+    await controller.checkIn({ user, body: { latitude: 12.9005, longitude: 77.5, officeLocationId: 3 } }, withinOffice);
+    assert.equal(withinOffice.statusCode, 201);
+
+    created = false;
+    await assert.rejects(
+        () => controller.checkIn({ user, body: { latitude: 12.91, longitude: 77.5, officeLocationId: 3 } }, response()),
+        { statusCode: 422, message: "You must be within the selected office location to check in." },
+    );
+    assert.equal(created, false);
 });
 
 test("checkout is conditional, server timed, and returns working duration", async () => {

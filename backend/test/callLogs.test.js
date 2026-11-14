@@ -19,6 +19,30 @@ test("creates an Outside Sales call log with JWT employee identity", async () =>
     assert.equal(data.notes, "Called");
 });
 
+test("masks nested customer phone numbers in sales call-log responses", async () => {
+    const callLog = {
+        id: 1,
+        customer: { id: 10, fullName: "Customer", phone: "+919876543210" },
+        employee: {},
+        property: null,
+    };
+    const controller = createCallLogController({ prismaClient: {
+        customer: { findFirst: async () => ({ id: 10 }) },
+        callLog: {
+            findMany: async () => [callLog],
+            create: async () => callLog,
+        },
+    } });
+
+    const listed = response();
+    await controller.listOwnCustomerLogs({ user: outside, params: { customerId: "10" } }, listed);
+    assert.equal(listed.body.data.callLogs[0].customer.phone, "****3210");
+
+    const created = response();
+    await controller.createOwnCustomerLog({ user: outside, params: { customerId: "10" }, body: { outcome: "INTERESTED" } }, created);
+    assert.equal(created.body.data.callLog.customer.phone, "****3210");
+});
+
 test("rejects employee spoofing and invalid call payloads", async () => {
     const controller = createCallLogController({ prismaClient: {} });
     await assert.rejects(() => controller.createOwnCustomerLog({ user: outside, params: { customerId: "10" }, body: { employeeId: 99, outcome: "INTERESTED" } }, response()), { statusCode: 400 });

@@ -43,6 +43,17 @@ function assignedCustomerWhere(customerId, user) {
         ? { id: customerId, assignment: { is: { insideSalesEmployeeId: user.id } } }
         : { id: customerId, visitSchedules: { some: { outsideSalesEmployeeId: user.id } } };
 }
+function maskPhone(phone) {
+    if (typeof phone !== "string") return phone ?? null;
+    const lastFour = phone.replace(/\D/g, "").slice(-4);
+    return lastFour ? `****${lastFour}` : null;
+}
+function presentEmployeeCallLog(callLog) {
+    return {
+        ...callLog,
+        customer: callLog.customer ? { ...callLog.customer, phone: maskPhone(callLog.customer.phone) } : callLog.customer,
+    };
+}
 
 export function createCallLogController({ prismaClient = prisma } = {}) {
     return {
@@ -51,7 +62,7 @@ export function createCallLogController({ prismaClient = prisma } = {}) {
             const customer = await prismaClient.customer.findFirst({ where: assignedCustomerWhere(customerId, req.user), select: { id: true } });
             if (!customer) throw new AppError(404, "Customer not found.");
             const callLogs = await prismaClient.callLog.findMany({ where: { customerId, employeeId: req.user.id }, select: callSelect, orderBy: [{ calledAt: "desc" }, { id: "desc" }] });
-            res.status(200).json({ success: true, data: { callLogs } });
+            res.status(200).json({ success: true, data: { callLogs: callLogs.map(presentEmployeeCallLog) } });
         },
         createOwnCustomerLog: async (req, res) => {
             const customerId = id(req.params.customerId, "customerId");
@@ -63,7 +74,7 @@ export function createCallLogController({ prismaClient = prisma } = {}) {
                 if (!property) throw new AppError(404, "Property not found.");
             }
             const callLog = await prismaClient.callLog.create({ data: { ...data, customerId, employeeId: req.user.id }, select: callSelect });
-            res.status(201).json({ success: true, data: { callLog } });
+            res.status(201).json({ success: true, data: { callLog: presentEmployeeCallLog(callLog) } });
         },
         listOrganizationLogs: async (req, res) => {
             const currentPage = page(req.query.page, 1, "page");

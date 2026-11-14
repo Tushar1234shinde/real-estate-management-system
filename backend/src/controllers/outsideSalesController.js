@@ -38,6 +38,19 @@ const scheduleInclude = {
     },
 };
 
+function maskPhone(phone) {
+    if (typeof phone !== "string") return phone ?? null;
+    const lastFour = phone.replace(/\D/g, "").slice(-4);
+    return lastFour ? `****${lastFour}` : null;
+}
+
+function presentSchedule(schedule) {
+    return {
+        ...schedule,
+        customer: schedule.customer ? { ...schedule.customer, phone: maskPhone(schedule.customer.phone) } : schedule.customer,
+    };
+}
+
 function parsePositiveInteger(value, fallback, fieldName, maximum) {
     if (value === undefined) {
         return fallback;
@@ -87,7 +100,7 @@ export function createOutsideSalesController({ prismaClient = prisma } = {}) {
             res.status(200).json({
                 success: true,
                 data: {
-                    schedules,
+                    schedules: schedules.map(presentSchedule),
                     pagination: {
                         page,
                         pageSize,

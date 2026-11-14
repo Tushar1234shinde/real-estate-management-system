@@ -1,5 +1,6 @@
 import prisma from "../config/prisma.js";
 import { AppError } from "../errors/AppError.js";
+import { calculateHaversineDistanceMeters } from "../utils/location.js";
 
 const EMPLOYEE_ROLES = new Set(["EXECUTIVE", "INSIDE_SALES", "OUTSIDE_SALES"]);
 const ATTENDANCE_STATUSES = new Set(["LOGGED_IN", "LOGGED_OUT", "AUTO_LOGGED_OUT"]);
@@ -83,8 +84,21 @@ export function createAttendanceController({ prismaClient = prisma, now = () => 
             const latitude = coordinate(req.body.latitude, "latitude", -90, 90);
             const longitude = coordinate(req.body.longitude, "longitude", -180, 180);
             const officeLocationId = positiveInteger(req.body.officeLocationId, "officeLocationId");
-            const office = await prismaClient.officeLocation.findFirst({ where: { id: officeLocationId, isActive: true }, select: { id: true } });
+            const office = await prismaClient.officeLocation.findFirst({
+                where: { id: officeLocationId, isActive: true },
+                select: { id: true, latitude: true, longitude: true, allowedRadiusMeters: true },
+            });
             if (!office) throw new AppError(422, "The selected office location is unavailable.");
+
+            const distanceMeters = calculateHaversineDistanceMeters(
+                latitude,
+                longitude,
+                office.latitude,
+                office.longitude,
+            );
+            if (distanceMeters > office.allowedRadiusMeters) {
+                throw new AppError(422, "You must be within the selected office location to check in.");
+            }
             try {
                 const attendance = await prismaClient.attendance.create({
                     data: { employeeId: req.user.id, officeLocationId: office.id, loginTime: now(), loginLatitude: latitude, loginLongitude: longitude },

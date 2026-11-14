@@ -224,6 +224,26 @@ function safeProfile(user) {
     };
 }
 
+function maskPhone(phone) {
+    if (typeof phone !== "string") return phone ?? null;
+    const lastFour = phone.replace(/\D/g, "").slice(-4);
+    return lastFour ? `****${lastFour}` : null;
+}
+
+function presentCustomer(customer) {
+    return { ...customer, phone: maskPhone(customer.phone) };
+}
+
+function presentSchedule(schedule) {
+    return {
+        ...schedule,
+        customer: schedule.customer ? presentCustomer(schedule.customer) : schedule.customer,
+        outsideSalesEmployee: schedule.outsideSalesEmployee
+            ? { ...schedule.outsideSalesEmployee, phone: maskPhone(schedule.outsideSalesEmployee.phone) }
+            : schedule.outsideSalesEmployee,
+    };
+}
+
 export function createInsideSalesController({ prismaClient = prisma } = {}) {
     return {
         listAssignedCustomers: async (req, res) => {
@@ -246,7 +266,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
 
             res.status(200).json({
                 success: true,
-                data: { customers, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } },
+                data: { customers: customers.map(presentCustomer), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } },
             });
         },
 
@@ -257,7 +277,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
                 select: customerSelect,
             });
             if (!customer) throw new AppError(404, "Customer not found.");
-            res.status(200).json({ success: true, data: { customer } });
+            res.status(200).json({ success: true, data: { customer: presentCustomer(customer) } });
         },
 
         listCallLogs: async (req, res) => {
@@ -317,7 +337,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
                 where: assignedCustomerWhere(customerId, req.user.id),
                 select: customerSelect,
             });
-            res.status(200).json({ success: true, data: { customer } });
+            res.status(200).json({ success: true, data: { customer: presentCustomer(customer) } });
         },
 
         listAvailableProperties: async (req, res) => {
@@ -362,7 +382,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
             ]);
             res.status(200).json({
                 success: true,
-                data: { schedules, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } },
+                data: { schedules: schedules.map(presentSchedule), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } },
             });
         },
 
@@ -401,7 +421,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
                     if (!isSerializationConflict(error) || attempt === MAX_TRANSACTION_RETRIES - 1) throw error;
                 }
             }
-            res.status(201).json({ success: true, data: { schedule } });
+            res.status(201).json({ success: true, data: { schedule: presentSchedule(schedule) } });
         },
 
         updateVisitSchedule: async (req, res) => {
@@ -463,7 +483,7 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
                     if (!isSerializationConflict(error) || attempt === MAX_TRANSACTION_RETRIES - 1) throw error;
                 }
             }
-            res.status(200).json({ success: true, data: { schedule } });
+            res.status(200).json({ success: true, data: { schedule: presentSchedule(schedule) } });
         },
 
         dashboard: async (req, res) => {
