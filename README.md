@@ -43,6 +43,14 @@ PropLattice is a full-stack real estate operations platform for employee managem
 - Audio recording and selfie uploads
 - Dashboard and activity monitoring
 
+## Mobile operational-security decision
+
+The web visit workflow performs explicit, foreground location verification and
+accepts validated evidence uploads. It does not claim to automatically record
+in the background, prevent operating-system screenshots, or continuously block
+an employee who leaves a geofence. The companion-app architecture and delivery
+roadmap are in [documentation/mobile-operational-security.md](documentation/mobile-operational-security.md).
+
 ## Project Structure
 
 ```text
