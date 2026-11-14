@@ -14,6 +14,7 @@ const visitSelect = {
     verificationCheckedAt: true,
     verificationDistanceMeters: true,
 };
+const EXECUTABLE_SCHEDULE_STATUSES = ["SCHEDULED", "RESCHEDULED"];
 
 function parseScheduleId(value) {
     if (!/^\d+$/.test(value ?? "")) {
@@ -51,68 +52,78 @@ export function createVisitScheduleController({ prismaClient = prisma } = {}) {
     return {
         initializeVisit: async (req, res) => {
             const scheduleId = parseScheduleId(req.params.scheduleId);
-            const schedule = await prismaClient.visitSchedule.findUnique({
+            const findCurrentSchedule = () => prismaClient.visitSchedule.findUnique({
                 where: { id: scheduleId },
                 select: {
                     id: true,
                     outsideSalesEmployeeId: true,
+                    status: true,
                     visit: { select: visitSelect },
                 },
             });
-
-            if (!schedule) {
-                throw new AppError(404, "Visit schedule not found.");
-            }
-
-            if (schedule.outsideSalesEmployeeId !== req.user.id) {
-                throw new AppError(403, "You do not have permission to access this visit schedule.");
-            }
-
-            if (schedule.visit) {
-                return res.status(200).json({
-                    success: true,
-                    data: {
-                        visit: schedule.visit,
-                        created: false,
-                    },
-                });
-            }
+            let result;
 
             try {
-                const visit = await prismaClient.visit.create({
-                    data: { scheduleId },
-                    select: visitSelect,
-                });
+                result = await prismaClient.$transaction(async (tx) => {
+                    const schedule = await tx.visitSchedule.findUnique({
+                        where: { id: scheduleId },
+                        select: {
+                            id: true,
+                            outsideSalesEmployeeId: true,
+                            status: true,
+                            visit: { select: visitSelect },
+                        },
+                    });
+                    if (!schedule) throw new AppError(404, "Visit schedule not found.");
+                    if (schedule.outsideSalesEmployeeId !== req.user.id) {
+                        throw new AppError(403, "You do not have permission to access this visit schedule.");
+                    }
+                    if (!EXECUTABLE_SCHEDULE_STATUSES.includes(schedule.status)) {
+                        throw new AppError(409, "This visit schedule is not available for execution.");
+                    }
+                    if (schedule.visit) return { visit: schedule.visit, created: false };
 
-                return res.status(201).json({
-                    success: true,
-                    data: {
-                        visit,
-                        created: true,
-                    },
-                });
+                    const scheduleLock = await tx.visitSchedule.updateMany({
+                        where: {
+                            id: scheduleId,
+                            outsideSalesEmployeeId: req.user.id,
+                            status: { in: EXECUTABLE_SCHEDULE_STATUSES },
+                        },
+                        data: { status: schedule.status },
+                    });
+                    if (scheduleLock.count !== 1) {
+                        const error = new Error("Visit schedule changed during initialization.");
+                        error.code = "P2034";
+                        throw error;
+                    }
+
+                    const visit = await tx.visit.create({
+                        data: { scheduleId },
+                        select: visitSelect,
+                    });
+                    return { visit, created: true };
+                }, { isolationLevel: "Serializable" });
             } catch (error) {
-                if (!isUniqueConstraintError(error)) {
+                if (!isUniqueConstraintError(error) && error?.code !== "P2034") throw error;
+
+                const schedule = await findCurrentSchedule();
+                if (!schedule) throw new AppError(404, "Visit schedule not found.");
+                if (schedule.outsideSalesEmployeeId !== req.user.id) {
+                    throw new AppError(403, "You do not have permission to access this visit schedule.");
+                }
+                if (!EXECUTABLE_SCHEDULE_STATUSES.includes(schedule.status)) {
+                    throw new AppError(409, "This visit schedule is not available for execution.");
+                }
+                if (schedule.visit) {
+                    result = { visit: schedule.visit, created: false };
+                } else if (error?.code === "P2034") {
+                    throw new AppError(409, "Visit schedule changed during initialization; retry the request.");
+                } else {
                     throw error;
                 }
-
-                const existingVisit = await prismaClient.visit.findUnique({
-                    where: { scheduleId },
-                    select: visitSelect,
-                });
-
-                if (!existingVisit) {
-                    throw error;
-                }
-
-                return res.status(200).json({
-                    success: true,
-                    data: {
-                        visit: existingVisit,
-                        created: false,
-                    },
-                });
             }
+
+            return res.status(result.created ? 201 : 200).json({ success: true, data: result });
         },
         verifyLocation: async (req, res) => {
             const visitId = parseVisitId(req.params.visitId);

@@ -6,7 +6,6 @@ import { createApp } from "../src/app.js";
 import { validateDatabaseTransport } from "../src/config/databaseSecurity.js";
 import { validateProductionConfiguration } from "../src/config/production.js";
 import { createGracefulShutdown, registerGracefulShutdown } from "../src/shutdown.js";
-import { requireTestDatabaseUrl } from "../integration/support/testDatabase.js";
 
 const jwtConfig = {
     secret: crypto.randomBytes(32).toString("base64url"),
@@ -56,40 +55,6 @@ test("validates secure database transport only in production", () => {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://user:password@db.example.test:5432/app?sslmode=require",
     }), /sslmode=verify-full/);
-});
-
-test("requires explicit and isolated integration database configuration", () => {
-    const testDatabaseUrl = "postgresql://test_user:test_password@integration-db.test:5432/real_estate_integration_test";
-    const developmentDatabaseUrl = "postgresql://dev_user:dev_password@development-db.test:5432/real_estate_db";
-    const safeEnvironment = {
-        NODE_ENV: "test",
-        INTEGRATION_TESTS_ENABLED: "true",
-        TEST_DATABASE_URL: testDatabaseUrl,
-        DATABASE_URL: developmentDatabaseUrl,
-        TEST_DATABASE_ALLOWED_HOSTS: "integration-db.test",
-    };
-
-    assert.equal(requireTestDatabaseUrl(safeEnvironment), testDatabaseUrl);
-    assert.throws(
-        () => requireTestDatabaseUrl({ ...safeEnvironment, INTEGRATION_TESTS_ENABLED: "false" }),
-        /INTEGRATION_TESTS_ENABLED/,
-    );
-    assert.throws(
-        () => requireTestDatabaseUrl({ ...safeEnvironment, NODE_ENV: "production" }),
-        /cannot run when NODE_ENV=production/,
-    );
-    assert.throws(
-        () => requireTestDatabaseUrl({ ...safeEnvironment, DATABASE_URL: testDatabaseUrl }),
-        /must not match DATABASE_URL/,
-    );
-    assert.throws(
-        () => requireTestDatabaseUrl({ ...safeEnvironment, TEST_DATABASE_ALLOWED_HOSTS: "other-db.test" }),
-        /host is not approved/,
-    );
-    assert.throws(
-        () => requireTestDatabaseUrl({ ...safeEnvironment, TEST_DATABASE_ALLOWED_HOSTS: "" }),
-        /TEST_DATABASE_ALLOWED_HOSTS/,
-    );
 });
 
 test("validates production configuration without including secret values in errors", () => {
@@ -142,6 +107,8 @@ test("returns lightweight liveness and generic readiness responses", async () =>
 test("gracefully closes once, disconnects Prisma, and unregisters signal handlers", async () => {
     let closeCalls = 0;
     let disconnectCalls = 0;
+    let stopWorkerCalls = 0;
+    const shutdownOrder = [];
     const exitCodes = [];
     let timeoutDelay;
     let timeoutCleared = false;
@@ -150,8 +117,17 @@ test("gracefully closes once, disconnects Prisma, and unregisters signal handler
 
     try {
         const shutdown = createGracefulShutdown({
-            server: { close(callback) { closeCalls += 1; callback(); } },
-            prismaClient: { async $disconnect() { disconnectCalls += 1; } },
+            server: { close(callback) { closeCalls += 1; shutdownOrder.push("server"); callback(); } },
+            prismaClient: {
+                async $disconnect() {
+                    disconnectCalls += 1;
+                    shutdownOrder.push("prisma");
+                },
+            },
+            async beforeDisconnect() {
+                stopWorkerCalls += 1;
+                shutdownOrder.push("worker");
+            },
             timeoutMs: 123,
             exit: (code) => exitCodes.push(code),
             setTimeoutFn: (callback, delay) => {
@@ -163,7 +139,9 @@ test("gracefully closes once, disconnects Prisma, and unregisters signal handler
 
         await Promise.all([shutdown("SIGTERM"), shutdown("SIGINT")]);
         assert.equal(closeCalls, 1);
+        assert.equal(stopWorkerCalls, 1);
         assert.equal(disconnectCalls, 1);
+        assert.deepEqual(shutdownOrder, ["server", "worker", "prisma"]);
         assert.deepEqual(exitCodes, [0]);
         assert.equal(timeoutDelay, 123);
         assert.equal(timeoutCleared, true);

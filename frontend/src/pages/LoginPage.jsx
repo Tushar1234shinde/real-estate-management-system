@@ -22,7 +22,7 @@ export default function LoginPage() {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const nextErrors = {}
-    const email = String(form.get("email") || "").trim()
+    const email = String(form.get("email") || "").trim().toLowerCase()
     const password = String(form.get("password") || "")
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       nextErrors.email = "Enter a valid work email"
@@ -139,9 +139,7 @@ export default function LoginPage() {
               )}
             </label>
             <div className="login-options">
-              <span className="muted">
-                Demo mode · no credentials are checked
-              </span>
+              <span className="muted">Use your assigned work credentials</span>
               <button
                 type="button"
                 className="text-button"
@@ -159,8 +157,7 @@ export default function LoginPage() {
             </button>
           </form>
           <div className="secure-note">
-            <ShieldCheck size={16} /> Demo access · Authentication is not
-            connected
+            <ShieldCheck size={16} /> Secure, role-based access
           </div>
           {notice && <small className="field-error">{notice}</small>}
         </div>

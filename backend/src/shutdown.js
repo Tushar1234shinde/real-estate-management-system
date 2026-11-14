@@ -7,6 +7,7 @@ function closeServer(server) {
 export function createGracefulShutdown({
     server,
     prismaClient,
+    beforeDisconnect = async () => {},
     timeoutMs = 10_000,
     exit = (code) => process.exit(code),
     setTimeoutFn = setTimeout,
@@ -34,6 +35,12 @@ export function createGracefulShutdown({
         let exitCode = 0;
         try {
             await closeServer(server);
+        } catch {
+            exitCode = 1;
+        }
+
+        try {
+            await beforeDisconnect();
         } catch {
             exitCode = 1;
         }

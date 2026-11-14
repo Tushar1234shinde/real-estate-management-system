@@ -107,6 +107,18 @@ test("logs in with valid credentials without exposing passwordHash", async () =>
     assert.equal(JSON.stringify(body).includes("passwordHash"), false);
 });
 
+test("normalizes email casing before authenticating", async () => {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "ADMIN@EXAMPLE.COM", password: "correct-password" }),
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.data.user.email, "admin@example.com");
+});
+
 test("returns the same generic failure for unknown, incorrect-password, and inactive accounts", async () => {
     const wrongPassword = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
@@ -297,17 +309,22 @@ test("validates JWT configuration and restricts CORS origins", () => {
     assert.throws(() => getCorsOptions({ NODE_ENV: "production" }), /CORS_ORIGINS/);
     assert.throws(() => getCorsOptions({ NODE_ENV: "production", CORS_ORIGINS: "*" }), /cannot include/);
     assert.deepEqual(getCorsOptions({ NODE_ENV: "development" }).origin.includes("http://localhost:5173"), true);
+    assert.deepEqual(getCorsOptions({ NODE_ENV: "development" }).origin.includes("http://localhost:8443"), true);
 });
 
 test("allows configured local CORS origins and omits CORS headers for other origins", async () => {
     const allowed = await fetch(`${baseUrl}/`, {
         headers: { Origin: "http://localhost:5173" },
     });
+    const viteOrigin = await fetch(`${baseUrl}/`, {
+        headers: { Origin: "http://localhost:8443" },
+    });
     const disallowed = await fetch(`${baseUrl}/`, {
         headers: { Origin: "https://untrusted.example" },
     });
 
     assert.equal(allowed.headers.get("access-control-allow-origin"), "http://localhost:5173");
+    assert.equal(viteOrigin.headers.get("access-control-allow-origin"), "http://localhost:8443");
     assert.equal(disallowed.headers.get("access-control-allow-origin"), null);
 });
 

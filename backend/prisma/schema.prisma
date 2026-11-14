@@ -89,6 +89,12 @@ enum LogoutReason {
   ADMIN_ACTION
 }
 
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
 enum WhatsAppMessageType {
   INTERESTED_THANK_YOU
   NOT_INTERESTED_FOLLOW_UP
@@ -103,6 +109,30 @@ enum MessageDeliveryStatus {
   DELIVERED
   READ
   FAILED
+}
+
+enum WhatsAppOutboxStatus {
+  PENDING
+  PROCESSING
+  SUBMITTING
+  SENT
+  FAILED
+  CANCELLED
+  UNKNOWN
+}
+
+enum WhatsAppConsentStatus {
+  OPTED_IN
+  OPTED_OUT
+}
+
+enum WhatsAppInboundProcessingClassification {
+  NORMAL
+  OPT_OUT
+  OPT_IN
+  STALE_OPT_IN
+  UNMATCHED
+  UNSUPPORTED
 }
 
 // -------------------- ROLES & USERS --------------------
@@ -138,16 +168,20 @@ model User {
   calls            CallLog[]
   attendance       Attendance[]
   notifications    Notification[]
+  announcementsCreated Announcement[]     @relation("AnnouncementCreatedBy")
+  announcementReads    AnnouncementRead[]
   whatsappMessages WhatsAppMessageLog[] @relation("MessageTriggeredBy")
 
   insideSalesSchedules  VisitSchedule[] @relation("InsideSalesSchedule")
   outsideSalesSchedules VisitSchedule[] @relation("OutsideSalesSchedule")
   schedulesCreated      VisitSchedule[] @relation("ScheduleCreatedBy")
 
-  uploadedMedia      MediaAsset[]
-  uploadedDocuments  PropertyDocument[]
-  reviewedVisits     Visit[]              @relation("VisitReviewedBy")
-  visitStatusChanges VisitStatusHistory[] @relation("VisitStatusChangedBy")
+  uploadedMedia           MediaAsset[]
+  uploadedDocuments       PropertyDocument[]
+  whatsappConsentEvents   WhatsAppConsentEvent[]       @relation("WhatsAppConsentRecordedBy")
+  whatsappIdempotencyKeys WhatsAppMessageIdempotency[]
+  reviewedVisits          Visit[]                      @relation("VisitReviewedBy")
+  visitStatusChanges      VisitStatusHistory[]         @relation("VisitStatusChangedBy")
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -159,18 +193,22 @@ model User {
 // -------------------- CUSTOMERS --------------------
 
 model Customer {
-  id             Int                    @id @default(autoincrement())
-  fullName       String
-  email          String?
-  phone          String
-  address        String?
-  status         CustomerStatus         @default(NEW)
-  interestStatus CustomerInterestStatus @default(PENDING)
+  id                    Int                    @id @default(autoincrement())
+  fullName              String
+  email                 String?
+  phone                 String
+  address               String?
+  status                CustomerStatus         @default(NEW)
+  interestStatus        CustomerInterestStatus @default(PENDING)
+  lastWhatsappInboundAt DateTime?              @db.Timestamptz(3)
 
-  assignment       CustomerAssignment?
-  calls            CallLog[]
-  visitSchedules   VisitSchedule[]
-  whatsappMessages WhatsAppMessageLog[]
+  assignment                        CustomerAssignment?
+  calls                             CallLog[]
+  visitSchedules                    VisitSchedule[]
+  whatsappMessages                  WhatsAppMessageLog[]
+  whatsappConsentEvents             WhatsAppConsentEvent[]
+  whatsappInboundEvents             WhatsAppInboundMessageEvent[]
+  whatsappMessageIdempotencyRecords WhatsAppMessageIdempotency[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -229,6 +267,11 @@ model PropertyDocument {
   uploadedByUserId Int
   documentName     String
   documentUrl      String
+  publicId         String?  @unique(map: "property_documents_publicId_key")
+  assetId          String?  @unique(map: "property_documents_assetId_key")
+  resourceType     String?
+  deliveryType     String?
+  fileSizeBytes    BigInt?
   mimeType         String?
   uploadedAt       DateTime @default(now()) @db.Timestamptz(3)
 
@@ -403,6 +446,44 @@ model Attendance {
   @@map("attendance")
 }
 
+// -------------------- ANNOUNCEMENTS --------------------
+
+model Announcement {
+  id          Int                  @id @default(autoincrement())
+  title       String
+  content     String
+  category    String
+  priority    AnnouncementPriority @default(NORMAL)
+  isPublished Boolean              @default(false)
+  expiresAt   DateTime?            @db.Timestamptz(3)
+  createdById Int
+
+  createdBy User               @relation("AnnouncementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  targetRoles RoleName[]       @default([])
+  reads       AnnouncementRead[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, expiresAt, createdAt])
+  @@index([createdById])
+  @@map("announcements")
+}
+
+model AnnouncementRead {
+  id             Int      @id @default(autoincrement())
+  announcementId Int
+  userId         Int
+  readAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([userId, readAt])
+  @@map("announcement_reads")
+}
+
 // -------------------- WHATSAPP MESSAGES --------------------
 
 model WhatsAppMessageLog {
@@ -414,10 +495,14 @@ model WhatsAppMessageLog {
   providerMessageId String?               @unique
   deliveryStatus    MessageDeliveryStatus @default(PENDING)
   sentAt            DateTime?             @db.Timestamptz(3)
+  statusUpdatedAt   DateTime?             @db.Timestamptz(3)
 
-  customer    Customer                    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  triggeredBy User?                       @relation("MessageTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
-  attachments WhatsAppMessageAttachment[]
+  customer          Customer                     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  triggeredBy       User?                        @relation("MessageTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  attachments       WhatsAppMessageAttachment[]
+  statusEvents      WhatsAppMessageStatusEvent[]
+  outbox            WhatsAppMessageOutbox?
+  idempotencyRecord WhatsAppMessageIdempotency?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
@@ -425,6 +510,113 @@ model WhatsAppMessageLog {
   @@index([deliveryStatus])
   @@index([triggeredByUserId])
   @@map("whatsapp_message_logs")
+}
+
+model WhatsAppMessageOutbox {
+  id                  Int                  @id @default(autoincrement())
+  messageLogId        Int                  @unique
+  status              WhatsAppOutboxStatus @default(PENDING)
+  claimToken          String?              @unique
+  attemptCount        Int                  @default(0)
+  nextAttemptAt       DateTime             @default(now()) @db.Timestamptz(3)
+  processingStartedAt DateTime?            @db.Timestamptz(3)
+  submissionStartedAt DateTime?            @db.Timestamptz(3)
+  completedAt         DateTime?            @db.Timestamptz(3)
+  lastErrorCode       String?
+
+  messageLog WhatsAppMessageLog @relation(fields: [messageLogId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt, id])
+  @@index([status, nextAttemptAt, createdAt, id])
+  @@index([status, processingStartedAt])
+  @@index([status, submissionStartedAt])
+  @@map("whatsapp_message_outbox")
+}
+
+model WhatsAppMessageIdempotency {
+  id                 Int    @id @default(autoincrement())
+  senderUserId       Int
+  customerId         Int
+  idempotencyKey     String @db.VarChar(128)
+  payloadFingerprint String @db.Char(64)
+  messageLogId       Int    @unique
+
+  sender     User               @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  messageLog WhatsAppMessageLog @relation(fields: [messageLogId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([senderUserId, customerId, idempotencyKey], map: "whatsapp_message_idempotency_senderUserId_customerId_idempotenc")
+  @@map("whatsapp_message_idempotency")
+}
+
+model WhatsAppPendingStatusEvent {
+  id                Int                   @id @default(autoincrement())
+  providerMessageId String
+  status            MessageDeliveryStatus
+  providerTimestamp DateTime              @db.Timestamptz(3)
+  providerErrorCode String?               @db.VarChar(100)
+  receivedAt        DateTime              @default(now()) @db.Timestamptz(3)
+
+  @@unique([providerMessageId, status, providerTimestamp], map: "whatsapp_pending_status_events_providerMessageId_status_provide")
+  @@index([providerMessageId, providerTimestamp], map: "whatsapp_pending_status_events_providerMessageId_providerTimest")
+  @@map("whatsapp_pending_status_events")
+}
+
+model WhatsAppConsentEvent {
+  id                    Int                   @id @default(autoincrement())
+  customerId            Int
+  recordedByUserId      Int?
+  inboundMessageEventId Int?                  @unique
+  status                WhatsAppConsentStatus
+  source                String
+  consentAt             DateTime              @default(now()) @db.Timestamptz(3)
+  recordedAt            DateTime              @default(now()) @db.Timestamptz(3)
+
+  customer            Customer                     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  recordedBy          User?                        @relation("WhatsAppConsentRecordedBy", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  inboundMessageEvent WhatsAppInboundMessageEvent? @relation(fields: [inboundMessageEventId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, recordedAt])
+  @@index([recordedByUserId])
+  @@map("whatsapp_consent_events")
+}
+
+model WhatsAppInboundMessageEvent {
+  id                       Int                                     @id @default(autoincrement())
+  providerMessageId        String                                  @unique
+  customerId               Int?
+  senderPhone              String
+  providerTimestamp        DateTime                                @db.Timestamptz(3)
+  messageType              String
+  processingClassification WhatsAppInboundProcessingClassification
+  receivedAt               DateTime                                @default(now()) @db.Timestamptz(3)
+
+  customer     Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  consentEvent WhatsAppConsentEvent?
+
+  @@index([customerId, providerTimestamp], map: "whatsapp_inbound_message_events_customerId_providerTimestamp_id")
+  @@index([senderPhone, providerTimestamp], map: "whatsapp_inbound_message_events_senderPhone_providerTimestamp_i")
+  @@map("whatsapp_inbound_message_events")
+}
+
+model WhatsAppMessageStatusEvent {
+  id                Int                   @id @default(autoincrement())
+  messageLogId      Int
+  status            MessageDeliveryStatus
+  providerTimestamp DateTime              @db.Timestamptz(3)
+  receivedAt        DateTime              @default(now()) @db.Timestamptz(3)
+  providerErrorCode String?
+
+  messageLog WhatsAppMessageLog @relation(fields: [messageLogId], references: [id], onDelete: Restrict)
+
+  @@unique([messageLogId, status, providerTimestamp], map: "whatsapp_message_status_events_messageLogId_status_providerTime")
+  @@index([messageLogId, providerTimestamp], map: "whatsapp_message_status_events_messageLogId_providerTimestamp_i")
+  @@map("whatsapp_message_status_events")
 }
 
 model WhatsAppMessageAttachment {

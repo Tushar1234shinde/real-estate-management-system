@@ -115,7 +115,7 @@ export function createAdminVisitReviewController({ prismaClient = prisma, cloudi
         const visitId = parseVisitId(req.params.visitId);
         const rejectionReason = decision === "REJECTED" ? parseRejectionReason(req.body?.rejectionReason) : null;
         const result = await prismaClient.$transaction(async (tx) => {
-            const visit = await tx.visit.findUnique({ where: { id: visitId }, select: { id: true, status: true } });
+            const visit = await tx.visit.findUnique({ where: { id: visitId }, select: { id: true, scheduleId: true, status: true } });
             if (!visit) throw new AppError(404, "Visit not found.");
             if (visit.status !== "PENDING_REVIEW") throw new AppError(409, "Visit is not pending review.");
 
@@ -130,6 +130,16 @@ export function createAdminVisitReviewController({ prismaClient = prisma, cloudi
             });
             if (update.count !== 1) throw new AppError(409, "Visit has already been reviewed.");
 
+            if (decision === "COMPLETED") {
+                const scheduleUpdate = await tx.visitSchedule.updateMany({
+                    where: { id: visit.scheduleId, status: { in: ["SCHEDULED", "RESCHEDULED"] } },
+                    data: { status: "COMPLETED" },
+                });
+                if (scheduleUpdate.count !== 1) {
+                    throw new AppError(409, "Visit schedule is no longer available for completion.");
+                }
+            }
+
             const history = await tx.visitStatusHistory.create({
                 data: {
                     visitId,
@@ -139,7 +149,8 @@ export function createAdminVisitReviewController({ prismaClient = prisma, cloudi
                     reason: rejectionReason ?? "Approved by reviewer.",
                 },
             });
-            return { visit: { ...visit, status: decision, reviewerId: req.user.id, rejectionReason }, history };
+            const { scheduleId, ...responseVisit } = visit;
+            return { visit: { ...responseVisit, status: decision, reviewerId: req.user.id, rejectionReason }, history };
         });
 
         return res.status(200).json({ success: true, data: result });

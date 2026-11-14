@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test test/auth.test.js test/outsideSales.test.js test/infrastructure.test.js",
+    "test": "node --test test/auth.test.js test/outsideSales.test.js test/insideSales.test.js test/whatsApp.test.js test/adminEmployees.test.js test/adminCustomers.test.js test/adminProperties.test.js test/adminDashboard.test.js test/attendance.test.js test/announcements.test.js test/callLogs.test.js test/infrastructure.test.js test/integrationSafety.test.js test/propertyDocuments.test.js",
     "test:integration": "node scripts/run-integration-tests.js",
     "test:cloudinary": "node scripts/run-cloudinary-integration-tests.js",
     "start": "node src/server.js",

@@ -8,4 +8,5 @@ export { outsideSalesApi } from "./outsideSales.js"
 export { visitsApi } from "./visits.js"
 export { propertiesApi } from "./properties.js"
 export { attendanceApi, adminAttendanceApi } from "./attendance.js"
-export { announcementsApi, adminAnnouncementsApi } from "./announcements.js"
+export { announcementsApi, adminAnnouncementsApi } from "./announcements.js";
+export { officeLocationsApi } from "./officeLocations.js";

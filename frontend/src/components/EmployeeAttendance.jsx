@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock, MapPin, RefreshCw } from "lucide-react";
 import { attendanceApi } from "../api/attendance.js";
+import { officeLocationsApi } from "../api/officeLocations.js";
 import { formatDateTime, toNumericId } from "../utils/apiMappers.js";
-
-const DEFAULT_OFFICE_LOCATION_ID = 1;
 
 function messageFor(error) {
   return error?.message || "The request could not be completed.";
@@ -54,9 +53,10 @@ export function EmployeeAttendance() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [geoPermission, setGeoPermission] = useState(null);
-  const [officeLocationId, setOfficeLocationId] = useState(
-    DEFAULT_OFFICE_LOCATION_ID
-  );
+  const [officeLocations, setOfficeLocations] = useState([]);
+  const [officeLocationsLoading, setOfficeLocationsLoading] = useState(false);
+  const [officeLocationId, setOfficeLocationId] = useState("");
+  const officeSelectedRef = useRef(false);
 
   const loadToday = useCallback(async () => {
     setLoading(true);
@@ -92,10 +92,33 @@ export function EmployeeAttendance() {
     }
   }, [page]);
 
+  const loadOfficeLocations = useCallback(async () => {
+    setOfficeLocationsLoading(true);
+    setError("");
+    try {
+      const data = await officeLocationsApi.listActiveOfficeLocations();
+      setOfficeLocations(data.officeLocations || []);
+      if (
+        data.officeLocations &&
+        data.officeLocations.length > 0 &&
+        !officeSelectedRef.current
+      ) {
+        setOfficeLocationId(String(data.officeLocations[0].id));
+        officeSelectedRef.current = true;
+      }
+    } catch (e) {
+      setError(messageFor(e));
+      setOfficeLocations([]);
+    } finally {
+      setOfficeLocationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadToday();
     loadHistory();
-  }, [loadToday, loadHistory]);
+    loadOfficeLocations();
+  }, [loadToday, loadHistory, loadOfficeLocations]);
 
   function getCoords() {
     return new Promise((resolve, reject) => {
@@ -131,6 +154,11 @@ export function EmployeeAttendance() {
 
   async function handleCheckIn() {
     if (checking) return;
+    if (!toNumericId(officeLocationId)) {
+      setError("Please select an office location.");
+      return;
+    }
+
     setError("");
     setSuccess("");
     setChecking(true);
@@ -140,7 +168,7 @@ export function EmployeeAttendance() {
       const body = {
         latitude: coords.latitude,
         longitude: coords.longitude,
-        officeLocationId: toNumericId(officeLocationId) || DEFAULT_OFFICE_LOCATION_ID,
+        officeLocationId: toNumericId(officeLocationId),
       };
       const data = await attendanceApi.checkIn(body);
       setSuccess("Checked in successfully.");
@@ -199,7 +227,7 @@ export function EmployeeAttendance() {
   }
 
   const canCheckIn =
-    todayStatus !== "LOGGED_IN" && !checking;
+    todayStatus !== "LOGGED_IN" && !checking && !!toNumericId(officeLocationId);
   const canCheckOut =
     todayStatus === "LOGGED_IN" && !checking;
 
@@ -293,15 +321,25 @@ export function EmployeeAttendance() {
 
         <div className="geo-section">
           <label className="field-label">
-            Office Location ID
-            <input
-              type="number"
-              min="1"
+            Office Location
+            <select
               value={officeLocationId}
               onChange={(e) => setOfficeLocationId(e.target.value)}
-              placeholder="e.g. 1"
-            />
+            >
+              <option value="">Select an office</option>
+              {officeLocations.map((office) => (
+                <option key={office.id} value={office.id}>
+                  {office.officeName}{office.address ? ` (${office.address})` : ""}
+                </option>
+              ))}
+            </select>
           </label>
+          {officeLocationsLoading && (
+            <span className="muted">Loading offices…</span>
+          )}
+          {officeLocations.length === 0 && !officeLocationsLoading && (
+            <span className="muted">No active offices available.</span>
+          )}
           <div className="geo-permission">
             <span>Location: </span>
             <span

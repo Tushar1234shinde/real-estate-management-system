@@ -61,6 +61,80 @@ async function getEligibleVisit(prismaClient, visitId, userId) {
     return visit;
 }
 
+async function persistEvidence(prismaClient, { visitId, userId, mediaType, uploaded, resourceType, file }) {
+    return prismaClient.$transaction(async (tx) => {
+        const visit = await tx.visit.findUnique({
+            where: { id: visitId },
+            select: {
+                id: true,
+                status: true,
+                verificationResult: true,
+                schedule: { select: { outsideSalesEmployeeId: true } },
+            },
+        });
+        if (!visit) throw new AppError(404, "Visit not found.");
+        if (visit.schedule.outsideSalesEmployeeId !== userId) {
+            throw new AppError(403, "You do not have permission to access this visit.");
+        }
+        if (visit.verificationResult !== "PASSED") {
+            throw new AppError(409, "Visit location verification must pass before uploading evidence.");
+        }
+        if (visit.status !== "IN_PROGRESS") {
+            throw new AppError(409, "Evidence cannot be uploaded for this visit.");
+        }
+
+        const lock = await tx.visit.updateMany({
+            where: { id: visitId, status: "IN_PROGRESS", verificationResult: "PASSED" },
+            data: { status: "IN_PROGRESS" },
+        });
+        if (lock.count !== 1) {
+            throw new AppError(409, "Evidence cannot be uploaded for this visit.");
+        }
+
+        const currentVisit = await tx.visit.findUnique({
+            where: { id: visitId },
+            select: {
+                id: true,
+                status: true,
+                verificationResult: true,
+                schedule: { select: { outsideSalesEmployeeId: true } },
+            },
+        });
+        if (!currentVisit) throw new AppError(404, "Visit not found.");
+        if (currentVisit.schedule.outsideSalesEmployeeId !== userId) {
+            throw new AppError(403, "You do not have permission to access this visit.");
+        }
+        if (currentVisit.verificationResult !== "PASSED") {
+            throw new AppError(409, "Visit location verification must pass before uploading evidence.");
+        }
+        if (currentVisit.status !== "IN_PROGRESS") {
+            throw new AppError(409, "Evidence cannot be uploaded for this visit.");
+        }
+
+        if (mediaType === SELFIE_TYPE) {
+            const existing = await tx.mediaAsset.findFirst({ where: { visitId, mediaType } });
+            if (existing) return { existing };
+        }
+
+        const media = await tx.mediaAsset.create({
+            data: {
+                visitId,
+                uploadedByUserId: userId,
+                mediaType,
+                fileUrl: uploaded.secure_url,
+                publicId: uploaded.public_id,
+                assetId: uploaded.asset_id ?? null,
+                resourceType: uploaded.resource_type ?? resourceType,
+                deliveryType: uploaded.type ?? "authenticated",
+                mimeType: file.mimetype,
+                fileSizeBytes: BigInt(uploaded.bytes ?? file.size),
+                durationSeconds: Number.isFinite(uploaded.duration) ? Math.round(uploaded.duration) : null,
+            },
+        });
+        return { media };
+    }, { isolationLevel: "Serializable" });
+}
+
 export function createEvidenceController({ prismaClient = prisma, cloudinaryClient, environment } = {}) {
     const getCloudinaryClient = () => cloudinaryClient ?? createCloudinaryClient(environment);
 
@@ -87,32 +161,14 @@ export function createEvidenceController({ prismaClient = prisma, cloudinaryClie
         });
 
         try {
-            const createMedia = async (db) => {
-                if (kind === "selfie") {
-                    const existing = await db.mediaAsset.findFirst({ where: { visitId, mediaType } });
-                    if (existing) return { existing };
-                }
-                const media = await db.mediaAsset.create({
-                    data: {
-                        visitId,
-                        uploadedByUserId: req.user.id,
-                        mediaType,
-                        fileUrl: uploaded.secure_url,
-                        publicId: uploaded.public_id,
-                        assetId: uploaded.asset_id ?? null,
-                        resourceType: uploaded.resource_type ?? resourceType,
-                        deliveryType: uploaded.type ?? "authenticated",
-                        mimeType: req.file.mimetype,
-                        fileSizeBytes: BigInt(uploaded.bytes ?? req.file.size),
-                        durationSeconds: Number.isFinite(uploaded.duration) ? Math.round(uploaded.duration) : null,
-                    },
-                });
-                return { media };
-            };
-            const persisted = kind === "selfie" && prismaClient.$transaction
-                ? await prismaClient.$transaction(createMedia, { isolationLevel: "Serializable" })
-                : await createMedia(prismaClient);
-
+            const persisted = await persistEvidence(prismaClient, {
+                visitId,
+                userId: req.user.id,
+                mediaType,
+                uploaded,
+                resourceType,
+                file: req.file,
+            });
             if (persisted.existing) {
                 await removeCloudinaryAsset(client, uploaded.public_id, resourceType);
                 return res.status(200).json({ success: true, data: { media: serializeMedia(persisted.existing), created: false } });
@@ -121,11 +177,15 @@ export function createEvidenceController({ prismaClient = prisma, cloudinaryClie
             return res.status(201).json({ success: true, data: { media: serializeMedia(persisted.media), created: true } });
         } catch (error) {
             await removeCloudinaryAsset(client, uploaded.public_id, resourceType);
-            if (kind === "selfie" && isTransactionConflict(error)) {
-                const existing = await prismaClient.mediaAsset.findFirst({ where: { visitId, mediaType } });
-                if (existing) {
-                    return res.status(200).json({ success: true, data: { media: serializeMedia(existing), created: false } });
+            if (isTransactionConflict(error)) {
+                if (kind === "selfie") {
+                    await getEligibleVisit(prismaClient, visitId, req.user.id);
+                    const existing = await prismaClient.mediaAsset.findFirst({ where: { visitId, mediaType } });
+                    if (existing) {
+                        return res.status(200).json({ success: true, data: { media: serializeMedia(existing), created: false } });
+                    }
                 }
+                throw new AppError(409, "Visit changed during evidence upload; retry the request.");
             }
             throw error;
         }

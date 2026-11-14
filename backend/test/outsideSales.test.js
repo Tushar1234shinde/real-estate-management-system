@@ -118,12 +118,15 @@ const schedules = [
         visit: { id: 47, scheduleId: 111, status: "IN_PROGRESS", reachedAt: null, completedAt: null, reachedLatitude: 12.1, reachedLongitude: 77.1, verificationResult: "PASSED", verificationCheckedAt: new Date(), verificationDistanceMeters: 0 },
     },
 ];
+for (const schedule of schedules) schedule.status ??= "SCHEDULED";
 
 let nextVisitId = 1;
 let nextMediaId = 1;
 let failNextMediaCreate = false;
+let afterNextCloudinaryUpload = null;
 let nextHistoryId = 1;
 let failNextHistoryCreate = false;
+let transactionTail = Promise.resolve();
 const mediaAssets = [];
 const visitStatusHistories = [];
 const destroyedCloudinaryAssets = [];
@@ -135,6 +138,11 @@ const cloudinaryClient = {
             uploadedCloudinaryOptions.push(options);
             return {
                 end(buffer) {
+                    if (afterNextCloudinaryUpload) {
+                        const changeStatus = afterNextCloudinaryUpload;
+                        afterNextCloudinaryUpload = null;
+                        changeStatus();
+                    }
                     callback(null, {
                         public_id: options.public_id,
                         asset_id: `asset-${options.public_id}`,
@@ -178,6 +186,14 @@ const prismaClient = {
         },
         async findUnique({ where }) {
             return schedules.find((schedule) => schedule.id === where.id) ?? null;
+        },
+        async updateMany({ where, data }) {
+            const schedule = schedules.find((candidate) => candidate.id === where.id);
+            if (!schedule) return { count: 0 };
+            const statuses = where.status?.in;
+            if (statuses && !statuses.includes(schedule.status)) return { count: 0 };
+            Object.assign(schedule, data);
+            return { count: 1 };
         },
     },
     visit: {
@@ -289,19 +305,38 @@ const prismaClient = {
     async $transaction(operations) {
         if (typeof operations !== "function") return Promise.all(operations);
 
-        const visitSnapshots = schedules.map((schedule) => schedule.visit && { schedule, visit: { ...schedule.visit } });
+        const previousTransaction = transactionTail;
+        let releaseTransaction;
+        transactionTail = new Promise((resolve) => {
+            releaseTransaction = resolve;
+        });
+        await previousTransaction;
+        const scheduleSnapshots = schedules.map((schedule) => ({
+            schedule,
+            status: schedule.status,
+            visit: schedule.visit ? { ...schedule.visit } : null,
+        }));
+        const mediaLength = mediaAssets.length;
         const historyLength = visitStatusHistories.length;
         try {
             return await operations(this);
         } catch (error) {
-            visitSnapshots.filter(Boolean).forEach(({ schedule, visit }) => {
+            scheduleSnapshots.forEach(({ schedule, status, visit }) => {
+                schedule.status = status;
+                if (!visit) {
+                    schedule.visit = null;
+                    return;
+                }
                 Object.keys(schedule.visit).forEach((key) => {
                     if (!(key in visit)) delete schedule.visit[key];
                 });
                 Object.assign(schedule.visit, visit);
             });
+            mediaAssets.splice(mediaLength);
             visitStatusHistories.splice(historyLength);
             throw error;
+        } finally {
+            releaseTransaction();
         }
     },
 };
@@ -382,6 +417,28 @@ test("initializes one visit per owned schedule and handles concurrent creation",
 
     assert.equal(existing.status, 200);
     assert.equal(existingBody.data.created, false);
+});
+
+test("does not initialize visits for cancelled or completed schedules", async () => {
+    const schedule = schedules.find((candidate) => candidate.id === 102);
+    try {
+        schedule.status = "CANCELLED";
+        const cancelled = await fetch(`${baseUrl}/api/visit-schedules/102/visit`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${tokenFor(users[1])}` },
+        });
+        schedule.status = "COMPLETED";
+        const completed = await fetch(`${baseUrl}/api/visit-schedules/102/visit`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${tokenFor(users[1])}` },
+        });
+
+        assert.equal(cancelled.status, 409);
+        assert.equal(completed.status, 409);
+        assert.equal(schedule.visit, null);
+    } finally {
+        schedule.status = "SCHEDULED";
+    }
 });
 
 test("rejects missing, invalid, and unowned schedule initialization", async () => {
@@ -509,6 +566,44 @@ test("uploads one authenticated selfie for a passed, owned visit and returns the
     assert.equal(duplicateBody.data.created, false);
     assert.equal(duplicateBody.data.media.id, uploadedBody.data.media.id);
     assert.equal(mediaAssets.filter((media) => media.visitId === 46 && media.mediaType === "VISIT_SELFIE").length, 1);
+});
+
+test("rejects evidence uploads for a submitted visit before Cloudinary upload", async () => {
+    const visit = schedules.find((schedule) => schedule.visit?.id === 40).visit;
+    const previousStatus = visit.status;
+    visit.status = "PENDING_REVIEW";
+    const uploadCount = uploadedCloudinaryOptions.length;
+    try {
+        const response = await uploadEvidence(40, "audio", users[1], mp3Bytes, "audio/mpeg");
+        assert.equal(response.status, 409);
+        assert.equal(uploadedCloudinaryOptions.length, uploadCount);
+    } finally {
+        visit.status = previousStatus;
+    }
+});
+
+test("rechecks visit status after Cloudinary upload and removes stale evidence", async () => {
+    const visit = schedules.find((schedule) => schedule.visit?.id === 45).visit;
+    const previousStatus = visit.status;
+    const previousVerification = visit.verificationResult;
+    afterNextCloudinaryUpload = () => {
+        visit.status = "PENDING_REVIEW";
+        visit.verificationResult = "PASSED";
+    };
+
+    try {
+        const response = await uploadEvidence(45, "selfie", users[1], jpegBytes, "image/jpeg");
+        const body = await response.json();
+
+        assert.equal(response.status, 409);
+        assert.match(body.message, /cannot be uploaded/i);
+        assert.equal(mediaAssets.some((media) => media.visitId === 45 && media.mediaType === "VISIT_SELFIE"), false);
+        assert.equal(destroyedCloudinaryAssets.at(-1).options.resource_type, "image");
+    } finally {
+        afterNextCloudinaryUpload = null;
+        visit.status = previousStatus;
+        visit.verificationResult = previousVerification;
+    }
 });
 
 test("handles concurrent duplicate selfie uploads without persisting a second selfie", async () => {
@@ -742,9 +837,11 @@ test("approves and rejects pending visits while recording the reviewer", async (
 
     assert.equal(approved.status, 200);
     assert.equal(approvedBody.data.visit.status, "COMPLETED");
+    assert.equal(schedules.find((schedule) => schedule.id === 110).status, "COMPLETED");
     assert.equal(approvedBody.data.history.changedByUserId, users[0].id);
     assert.equal(rejected.status, 200);
     assert.equal(rejectedBody.data.visit.status, "REJECTED");
+    assert.equal(schedules.find((schedule) => schedule.id === 111).status, "SCHEDULED");
     assert.equal(rejectedBody.data.visit.rejectionReason, "Selfie does not clearly show the property.");
     assert.equal(rejectedBody.data.history.changedByUserId, users[3].id);
 });
@@ -783,5 +880,6 @@ test("rolls back a review decision when history creation fails", async () => {
     const visit = schedules.find((schedule) => schedule.visit?.id === 44).visit;
     assert.equal(visit.status, "PENDING_REVIEW");
     assert.equal(visit.reviewerId, undefined);
+    assert.equal(schedules.find((schedule) => schedule.id === 108).status, "SCHEDULED");
     assert.equal(visitStatusHistories.filter((history) => history.visitId === 44 && history.newStatus === "COMPLETED").length, 0);
 });

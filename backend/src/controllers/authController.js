@@ -26,7 +26,10 @@ export function createAuthController({ prismaClient = prisma, jwtConfig } = {}) 
 
     return {
         login: async (req, res) => {
-            const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+            // Email domains are case-insensitive and accounts are stored in a
+            // canonical form by the employee-management flow. Normalize here
+            // as well so a user is not locked out by typing capital letters.
+            const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
             const password = typeof req.body?.password === "string" ? req.body.password : "";
 
             if (!EMAIL_PATTERN.test(email) || email.length > MAX_EMAIL_LENGTH || !password || password.length > MAX_PASSWORD_LENGTH) {

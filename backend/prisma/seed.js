@@ -33,7 +33,7 @@ function requiredPassword() {
 
 async function seed() {
     const adminName = requiredTrimmedEnvironmentVariable("ADMIN_NAME");
-    const adminEmail = requiredTrimmedEnvironmentVariable("ADMIN_EMAIL");
+    const adminEmail = requiredTrimmedEnvironmentVariable("ADMIN_EMAIL").toLowerCase();
     const adminPassword = requiredPassword();
     const passwordHash = await bcrypt.hash(adminPassword, BCRYPT_SALT_ROUNDS);
 

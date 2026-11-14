@@ -12,10 +12,29 @@ import { createVisitScheduleRouter } from "./routes/visitScheduleRoutes.js";
 import { createVisitRouter } from "./routes/visitRoutes.js";
 import { createEvidenceRouter } from "./routes/evidenceRoutes.js";
 import { createAdminVisitReviewRouter } from "./routes/adminVisitReviewRoutes.js";
+import { createInsideSalesRouter } from "./routes/insideSalesRoutes.js";
+import { createAdminEmployeeRouter } from "./routes/adminEmployeeRoutes.js";
+import { createAdminCustomerRouter } from "./routes/adminCustomerRoutes.js";
+import { createAdminPropertyRouter } from "./routes/adminPropertyRoutes.js";
+import { createAdminDashboardRouter } from "./routes/adminDashboardRoutes.js";
+import { createExecutiveRouter } from "./routes/executiveRoutes.js";
+import { createWhatsAppWebhookRouter } from "./routes/whatsAppWebhookRoutes.js";
+import { createAdminAttendanceRouter, createAttendanceRouter } from "./routes/attendanceRoutes.js";
+import { createAdminAnnouncementRouter, createAnnouncementRouter } from "./routes/announcementRoutes.js";
+import { createAdminCallLogRouter } from "./routes/callLogRoutes.js";
+import { createOfficeLocationRouter } from "./routes/officeLocationRoutes.js";
 
 const JSON_BODY_LIMIT = "100kb";
 
-export function createApp({ prismaClient, jwtConfig, corsOptions, loginRateLimiter, cloudinaryClient, environment } = {}) {
+export function createApp({
+    prismaClient,
+    jwtConfig,
+    corsOptions,
+    loginRateLimiter,
+    cloudinaryClient,
+    metaWhatsAppClient,
+    environment,
+} = {}) {
     const app = express();
     validateProductionConfiguration(environment ?? process.env);
     const readinessPrisma = prismaClient ?? prisma;
@@ -31,7 +50,14 @@ export function createApp({ prismaClient, jwtConfig, corsOptions, loginRateLimit
         crossOriginResourcePolicy: { policy: "cross-origin" },
     }));
     app.use(cors(resolvedCorsOptions));
-    app.use(express.json({ limit: JSON_BODY_LIMIT }));
+    app.use(
+        "/api/webhooks/whatsapp",
+        express.raw({ type: "application/json", limit: JSON_BODY_LIMIT, inflate: false }),
+        createWhatsAppWebhookRouter({ prismaClient, environment }),
+    );
+    app.use(express.json({
+        limit: JSON_BODY_LIMIT,
+    }));
 
     app.get("/", (req, res) => {
         res.status(200).json({
@@ -58,7 +84,36 @@ export function createApp({ prismaClient, jwtConfig, corsOptions, loginRateLimit
         jwtConfig: resolvedJwtConfig,
         loginRateLimiter,
     }));
+    app.use("/api/attendance", createAttendanceRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/announcements", createAnnouncementRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
     app.use("/api/outside-sales", createOutsideSalesRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+        cloudinaryClient,
+        environment,
+    }));
+    app.use("/api/inside-sales", createInsideSalesRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+        cloudinaryClient,
+        metaWhatsAppClient,
+        environment,
+    }));
+    app.use("/api/executive", createExecutiveRouter({
         prismaClient,
         jwtSecret: resolvedJwtConfig.secret,
         jwtIssuer: resolvedJwtConfig.issuer,
@@ -92,7 +147,58 @@ export function createApp({ prismaClient, jwtConfig, corsOptions, loginRateLimit
         cloudinaryClient,
         environment,
     }));
-
+    app.use("/api/admin", createAdminEmployeeRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/admin", createAdminCustomerRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+        metaWhatsAppClient,
+        environment,
+    }));
+    app.use("/api/admin", createAdminPropertyRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+        cloudinaryClient,
+        environment,
+    }));
+    app.use("/api/admin", createAdminDashboardRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/admin", createAdminAttendanceRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/admin", createAdminAnnouncementRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/admin", createAdminCallLogRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
+    app.use("/api/admin/office-locations", createOfficeLocationRouter({
+        prismaClient,
+        jwtSecret: resolvedJwtConfig.secret,
+        jwtIssuer: resolvedJwtConfig.issuer,
+        jwtAudience: resolvedJwtConfig.audience,
+    }));
     app.use(notFoundHandler);
     app.use(errorHandler);
 
