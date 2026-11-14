@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from "react-router"
 import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
 import AdminExecutiveWorkspace from "./AdminExecutiveWorkspace.jsx"
 import InsideSalesWorkspace from "./InsideSalesWorkspace.jsx"
+import OutsideSalesWorkspace from "./OutsideSalesWorkspace.jsx"
 import { EmployeeAttendance } from "../components/EmployeeAttendance.jsx"
 import { AdminAttendance } from "../components/AdminAttendance.jsx"
 import { AnnouncementList } from "../components/AnnouncementList.jsx"
@@ -3083,6 +3084,10 @@ function Dashboard() {
 
   if (user?.role === "INSIDE_SALES") {
     return <InsideSalesWorkspace />
+  }
+
+  if (user?.role === "OUTSIDE_SALES") {
+    return <OutsideSalesWorkspace />
   }
 
   return <LegacyDashboard />
