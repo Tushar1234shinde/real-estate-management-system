@@ -331,7 +331,8 @@ if (!enabled) {
         const statistics = await request(baseUrl, `/api/admin/announcements/${announcement.id}/read-statistics`, data.admin);
         assert.equal(statistics.status, 200);
         assert.equal((await statistics.json()).data.readCount, 1);
-        assert.equal((await request(baseUrl, `/api/admin/announcements/${announcement.id}/read-statistics`, data.executive)).status, 403);
+        assert.equal((await request(baseUrl, `/api/admin/announcements/${announcement.id}/read-statistics`, data.executive)).status, 200);
+        assert.equal((await request(baseUrl, `/api/admin/announcements/${announcement.id}/read-statistics`, data.inside)).status, 403);
     });
 
     test("persists assigned employee call logs and permits organization-wide filtered reporting", async () => {

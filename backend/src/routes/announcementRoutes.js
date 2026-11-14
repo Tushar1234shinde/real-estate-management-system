@@ -20,6 +20,6 @@ export function createAnnouncementRouter({ prismaClient, jwtSecret, jwtIssuer, j
 export function createAdminAnnouncementRouter({ prismaClient, jwtSecret, jwtIssuer, jwtAudience } = {}) {
     const router = Router();
     const controller = createAnnouncementController({ prismaClient });
-    router.get("/announcements/:announcementId/read-statistics", createAuthenticate({ prismaClient, jwtSecret, jwtIssuer, jwtAudience }), authorizeRoles(ROLES.ADMIN), asyncHandler(controller.readStatistics));
+    router.get("/announcements/:announcementId/read-statistics", createAuthenticate({ prismaClient, jwtSecret, jwtIssuer, jwtAudience }), authorizeRoles(ROLES.ADMIN, ROLES.EXECUTIVE), asyncHandler(controller.readStatistics));
     return router;
 }

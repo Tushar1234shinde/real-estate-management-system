@@ -18,6 +18,24 @@ test("creates announcements from the authenticated creator with validated fields
     await assert.rejects(() => controller.create({ user: admin, body: { ...data, createdById: 99 } }, response()), { statusCode: 400 });
 });
 
+test("rejects expired notices and persists a future expiry", async () => {
+    let data;
+    const now = new Date("2026-11-14T10:00:00.000Z");
+    const controller = createAnnouncementController({
+        now: () => now,
+        prismaClient: { announcement: { create: async (input) => { data = input.data; return record; } } },
+    });
+    await assert.rejects(() => controller.create({
+        user: admin,
+        body: { title: "Expired", content: "Old notice", category: "HOLIDAY", expiresAt: "2026-11-14T09:59:59.000Z" },
+    }, response()), { statusCode: 400 });
+    await controller.create({
+        user: admin,
+        body: { title: "Holiday", content: "Office closure", category: "HOLIDAY", expiresAt: "2026-11-15T10:00:00.000Z" },
+    }, response());
+    assert.equal(data.expiresAt.toISOString(), "2026-11-15T10:00:00.000Z");
+});
+
 test("employee listing constrains visibility to published, current role-targeted announcements", async () => {
     let where;
     const controller = createAnnouncementController({ prismaClient: { $transaction: async (items) => Promise.all(items), announcement: { findMany: async (input) => { where = input.where; return [record]; }, count: async () => 1 } } });

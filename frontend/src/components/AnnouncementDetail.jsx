@@ -17,7 +17,7 @@ export function AnnouncementDetail({ announcementId, onClose, onRefresh }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [readLoading, setReadLoading] = useState(false);
-  const isAdmin = user?.role === "ADMIN";
+  const canViewStats = user?.role === "ADMIN" || user?.role === "EXECUTIVE";
 
   const loadAnnouncement = useCallback(async () => {
     setLoading(true);
@@ -33,14 +33,14 @@ export function AnnouncementDetail({ announcementId, onClose, onRefresh }) {
   }, [announcementId]);
 
   const loadStats = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canViewStats) return;
     try {
       const data = await adminAnnouncementsApi.getReadStatistics(announcementId);
       setStats(data);
     } catch {
       // Stats are optional; ignore errors
     }
-  }, [announcementId, isAdmin]);
+  }, [announcementId, canViewStats]);
 
   useEffect(() => {
     loadAnnouncement();

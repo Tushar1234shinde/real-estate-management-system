@@ -9,7 +9,7 @@ function messageFor(error) {
   return error?.message || "The request could not be completed.";
 }
 
-export function AnnouncementList({ role, onEdit, onDelete, onRefresh }) {
+export function AnnouncementList({ role, onEdit, onDelete, onStats, onRefresh }) {
   const [announcements, setAnnouncements] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [page, setPage] = useState(1);
@@ -179,6 +179,17 @@ export function AnnouncementList({ role, onEdit, onDelete, onRefresh }) {
                             ) : (
                               <span>Delete</span>
                             )}
+                          </button>
+                        )}
+                        {onStats && (
+                          <button
+                            className="text-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStats(item);
+                            }}
+                          >
+                            Read status
                           </button>
                         )}
                       </>

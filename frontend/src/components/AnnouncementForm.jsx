@@ -41,7 +41,9 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
         category,
         priority,
         isPublished,
-        expiresAt: expiresAt || null,
+        // datetime-local has no timezone; normalize it before sending the API's
+        // required ISO-8601 timestamp.
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         targetRoles: targetRoles.length > 0 ? targetRoles : [],
       };
 
