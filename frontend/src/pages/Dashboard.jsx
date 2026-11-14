@@ -62,7 +62,7 @@ import {
   roleNames,
 } from "../data/mockData.js"
 
-const STORAGE_KEY = "proptide-demo-data-v2"
+const STORAGE_KEY = "proplattice-demo-data-v2"
 
 const navByRole = {
   admin: [
@@ -188,11 +188,9 @@ function readStoredData() {
 function Logo() {
   return (
     <div className="app-logo">
-      <span>
-        <Building2 />
-      </span>
+      <img src="/proplattice-logo.png" alt="PropLattice" />
       <div>
-        PROPTIDE<small>OPERATIONS</small>
+        PROPLATTICE<small>REAL ESTATE, IN SYNC</small>
       </div>
     </div>
   )
@@ -230,7 +228,7 @@ function Sidebar({ role, employee, open, onClose }) {
         </div>
         <strong>Need assistance?</strong>
         <p>This frontend demo does not connect to a support service.</p>
-        <a href="mailto:support@proptide.com">Contact support</a>
+        <a href="mailto:support@proplattice.com">Contact support</a>
       </div>
       <div className="sidebar-user">
         <div className="avatar">{getInitials(employee?.name)}</div>

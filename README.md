@@ -1,6 +1,6 @@
-# Real Estate Management System
+# PropLattice
 
-A full-stack web application designed to streamline real estate business operations, employee management, customer relationships, sales activities, property visits and attendance tracking.
+PropLattice is a full-stack real estate operations platform for employee management, customer relationships, sales activity, property visits, and attendance tracking.
 
 ## Live Demo
 

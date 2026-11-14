@@ -2,7 +2,6 @@ import { useState } from "react"
 import { Navigate, useNavigate } from "react-router"
 import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
 import {
-  Building2,
   Eye,
   EyeOff,
   ArrowRight,
@@ -59,19 +58,17 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-brand">
-        <div className="brand-mark">
-          <Building2 size={24} />
-        </div>
+          <img className="login-brand-logo" src="/proplattice-logo.png" alt="PropLattice" />
         <div className="login-story">
-          <span className="eyebrow dark">ONE PLATFORM. EVERY OPPORTUNITY.</span>
+          <span className="eyebrow dark">THE REAL ESTATE OPERATING SYSTEM</span>
           <h1>
-            Real estate operations,
+            Every property move,
             <br />
-            beautifully connected.
+            perfectly orchestrated.
           </h1>
           <p>
-            Empower your sales teams, improve field execution, and turn every
-            customer interaction into a measurable outcome.
+            Bring property, people, and customer journeys into one composed
+            workspace built for decisive teams.
           </p>
           <div className="promise-list">
             <span>
@@ -86,17 +83,14 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="login-brand-foot">
-          PROPTIDE <span>OPERATIONS CLOUD</span>
+          PROPLATTICE <span>REAL ESTATE, IN SYNC</span>
         </div>
       </section>
 
       <section className="login-panel">
         <div className="login-box">
           <div className="mobile-brand">
-            <div className="brand-mark">
-              <Building2 size={20} />
-            </div>{" "}
-            Proptide
+            <img src="/proplattice-logo.png" alt="" /> PropLattice
           </div>
           <span className="eyebrow">WELCOME BACK</span>
           <h2>Open your workspace</h2>
@@ -110,7 +104,7 @@ export default function LoginPage() {
               <input
                 name="email"
                 type="email"
-                placeholder="name@proptide.com"
+                placeholder="name@proplattice.com"
                 autoComplete="email"
               />
               {errors.email && (
@@ -163,7 +157,7 @@ export default function LoginPage() {
         </div>
         <p className="login-help">
           Need help?{" "}
-          <a href="mailto:support@proptide.com">Contact IT support</a>
+          <a href="mailto:support@proplattice.com">Contact IT support</a>
         </p>
       </section>
     </main>

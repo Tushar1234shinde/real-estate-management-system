@@ -48,7 +48,7 @@ export function createInitialData() {
 
         name: "Arjun Sharma",
 
-        email: "admin@proptide.com",
+        email: "admin@proplattice.com",
 
         phone: "9876543200",
 
