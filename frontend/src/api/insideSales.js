@@ -15,6 +15,7 @@ export const insideSalesApi = {
   listDocuments: (propertyId, query, options) => apiRequest(`/api/inside-sales/properties/${propertyId}/documents`, { query, ...options }),
   getDocumentAccess: (propertyId, documentId, options) => apiRequest(`/api/inside-sales/properties/${propertyId}/documents/${documentId}/access`, options),
   sendWhatsAppMessage: (customerId, body, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-messages`, { method: "POST", body, ...options }),
+  sendOutcomeWhatsApp: (customerId, outcome, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-messages`, { method: "POST", body: { outcome }, ...options }),
   listWhatsAppMessages: (customerId, query, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-messages`, { query, ...options }),
   recordWhatsAppConsent: (customerId, body, options) => apiRequest(`/api/inside-sales/customers/${customerId}/whatsapp-consent`, { method: "PATCH", body, ...options }),
 }

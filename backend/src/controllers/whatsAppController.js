@@ -84,7 +84,15 @@ function parseObjectBody(body, allowedFields) {
 }
 
 function parseMessageBody(body) {
-    parseObjectBody(body, new Set(["messageContent"]));
+    parseObjectBody(body, new Set(["messageContent", "outcome"]));
+    if (body.outcome !== undefined) {
+        if (body.messageContent !== undefined || !["INTERESTED", "NOT_INTERESTED"].includes(body.outcome)) {
+            throw new AppError(400, "outcome must be INTERESTED or NOT_INTERESTED and cannot be combined with messageContent.");
+        }
+        return body.outcome === "INTERESTED"
+            ? { messageType: "INTERESTED_THANK_YOU", messageContent: "Thank you for your interest in PropLattice. We are pleased to help with the next steps for your selected property. Reply here if you have any questions." }
+            : { messageType: "NOT_INTERESTED_FOLLOW_UP", messageContent: "Thank you for letting us know. We will respect your preference and will not send further property updates unless you choose to contact us again." };
+    }
     if (typeof body.messageContent !== "string") {
         throw new AppError(400, "messageContent must be a non-empty string.");
     }
@@ -92,7 +100,7 @@ function parseMessageBody(body) {
     if (!messageContent || messageContent.length > MAX_MESSAGE_LENGTH) {
         throw new AppError(400, `messageContent must be between 1 and ${MAX_MESSAGE_LENGTH} characters.`);
     }
-    return messageContent;
+    return { messageType: "GENERAL_UPDATE", messageContent };
 }
 
 function parseIdempotencyKey(value) {
@@ -103,9 +111,9 @@ function parseIdempotencyKey(value) {
     return value;
 }
 
-function messagePayloadFingerprint(messageContent) {
+function messagePayloadFingerprint(messageContent, messageType) {
     return crypto.createHash("sha256")
-        .update(JSON.stringify({ version: 1, messageType: "GENERAL_UPDATE", messageContent }))
+        .update(JSON.stringify({ version: 1, messageType, messageContent }))
         .digest("hex");
 }
 
@@ -601,9 +609,9 @@ export function createWhatsAppController({
 
         sendTextMessage: async (req, res) => {
             const customerId = parsePositiveInteger(req.params.customerId, "customerId");
-            const messageContent = parseMessageBody(req.body);
+            const { messageContent, messageType } = parseMessageBody(req.body);
             const idempotencyKey = parseIdempotencyKey(req.get("Idempotency-Key"));
-            const payloadFingerprint = idempotencyKey ? messagePayloadFingerprint(messageContent) : null;
+            const payloadFingerprint = idempotencyKey ? messagePayloadFingerprint(messageContent, messageType) : null;
             let result;
 
             try {
@@ -641,7 +649,7 @@ export function createWhatsAppController({
                         data: {
                             customerId,
                             triggeredByUserId: req.user.id,
-                            messageType: "GENERAL_UPDATE",
+                            messageType,
                             messageContent,
                             deliveryStatus: "PENDING",
                         },
