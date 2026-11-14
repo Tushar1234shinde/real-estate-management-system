@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { NavLink, useNavigate, useParams } from "react-router"
 import { roleRoute, useAuth } from "../auth/AuthContext.jsx"
 import AdminExecutiveWorkspace from "./AdminExecutiveWorkspace.jsx"
+import InsideSalesWorkspace from "./InsideSalesWorkspace.jsx"
 import { EmployeeAttendance } from "../components/EmployeeAttendance.jsx"
 import { AdminAttendance } from "../components/AdminAttendance.jsx"
 import { AnnouncementList } from "../components/AnnouncementList.jsx"
@@ -3078,6 +3079,10 @@ function Dashboard() {
 
   if (user?.role === "ADMIN" || user?.role === "EXECUTIVE") {
     return <AdminExecutiveWorkspace />
+  }
+
+  if (user?.role === "INSIDE_SALES") {
+    return <InsideSalesWorkspace />
   }
 
   return <LegacyDashboard />
