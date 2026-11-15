@@ -785,34 +785,38 @@ export default function AdminExecutiveWorkspace() {
                       <>
                         <td data-label="Employee"><div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>{row.profileImageUrl ? <img src={row.profileImageUrl} alt="" className="avatar" style={{ objectFit: "cover", borderRadius: "50%", flexShrink: 0 }} /> : <div className="avatar" style={{ flexShrink: 0 }}>{initials(row.fullName)}</div>}<div><strong>{row.fullName}</strong><span>{row.email}</span></div></div></td>
                         <td data-label="Role">{enumLabel(row.role?.name || row.role)}</td>
-                        <td data-label="Status"><span className={`status ${row.isActive ? "success" : "danger"}`}><i />{row.isActive ? "Active" : "Inactive"}</span></td>
-                        <td data-label="Actions">
+                        <td data-label="Status"><span className={`status-badge ${row.isActive ? "status-active" : "status-inactive"}`}>{row.isActive ? "Active" : "Inactive"}</span></td>
+                        <td data-label="Actions"><div className="table-actions">
                           <button className="secondary-button" onClick={() => setModal({ type: "employee", record: row })}>Details / edit</button>
                           {isAdmin && <button className="text-button" onClick={() => toggleStatus(row)}>{row.isActive ? "Deactivate" : "Activate"}</button>}
-                        </td>
+                        </div></td>
                       </>
                     ) : section === "properties" ? (
                       <>
                         <td data-label="Property"><strong>{row.title}</strong><span>{row.description || "No description"}</span></td>
                         <td data-label="Location">{row.location}</td>
                         <td data-label="Price">{row.price}</td>
-                        <td data-label="Availability"><span className="status neutral"><i />{enumLabel(row.status)}</span></td>
-                        <td data-label="Actions">
+                        <td data-label="Availability"><span className={`status-badge ${row.status === "AVAILABLE" ? "status-available" : row.status === "SOLD" ? "status-inactive" : "status-pending"}`}>{enumLabel(row.status)}</span></td>
+                        <td data-label="Actions"><div className="table-actions">
                           <button className="secondary-button" onClick={() => setModal({ type: "property", record: row })}>Details / edit</button>
                           <button className="text-button" onClick={() => { setDocumentProperty(row); setModal(null) }}>Documents</button>
-                        </td>
+                        </div></td>
                       </>
                     ) : (
                       <>
                         <td data-label="Customer"><strong>{row.fullName}</strong><span>{row.email || "No email"}</span></td>
                         <td data-label="Phone">{row.phone}</td>
-                        <td data-label="Status">{enumLabel(row.status)} / {enumLabel(row.interestStatus)}</td>
+                        <td data-label="Status">
+                          <span className={`status-badge ${row.status === "ACTIVE" ? "status-active" : "status-inactive"}`}>{enumLabel(row.status)}</span>
+                          {" "}
+                          <span className={`status-badge ${row.interestStatus === "INTERESTED" ? "status-interested" : row.interestStatus === "NOT_INTERESTED" ? "status-not-interested" : "status-pending"}`}>{enumLabel(row.interestStatus)}</span>
+                        </td>
                         <td data-label="Assignment">{row.assignment ? `Inside Sales #${row.assignment.insideSalesEmployeeId}` : "Unassigned"}</td>
-                        <td data-label="Actions">
+                        <td data-label="Actions"><div className="table-actions">
                           <button className="secondary-button" onClick={() => setModal({ type: "customer", record: row })}>Details / edit</button>
                           <button className="text-button" onClick={() => { setModal(null); setWhatsappCustomer(row); }}>WhatsApp</button>
                           {section === "assignments" && !row.assignment && <button className="text-button" onClick={() => setSelected(row)}>Assign</button>}
-                        </td>
+                        </div></td>
                       </>
                     )}
                   </tr>
@@ -883,7 +887,13 @@ export default function AdminExecutiveWorkspace() {
       )}
       {whatsappCustomer && (
         <Dialog title={`WhatsApp · ${whatsappCustomer.fullName}`} onClose={() => setWhatsappCustomer(null)}>
-          <CustomerWhatsApp customerId={whatsappCustomer.id} role={role} />
+          <CustomerWhatsApp
+            customerId={whatsappCustomer.id}
+            customer={whatsappCustomer}
+            interestStatus={whatsappCustomer.interestStatus}
+            role={role}
+            onClose={() => setWhatsappCustomer(null)}
+          />
         </Dialog>
       )}
     </Shell>

@@ -1214,7 +1214,12 @@ function CustomerDrawer({
         {role === "inside-sales" && (
           <div className="drawer-section">
             <h4>WhatsApp messages</h4>
-            <CustomerWhatsApp customerId={customer.id} role={role} />
+            <CustomerWhatsApp
+              customerId={customer.id}
+              customer={customer}
+              interestStatus={customer.interestStatus}
+              role={role}
+            />
           </div>
         )}
         {(canManage || canAssignInside) && (

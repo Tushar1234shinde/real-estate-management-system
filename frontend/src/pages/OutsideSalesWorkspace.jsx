@@ -49,10 +49,19 @@ function Shell({ section, children }) {
           <div><strong>{user?.name || "Outside Sales"}</strong><small>Outside Sales Employee</small></div>
         </div>
       </aside>
+      {open && <div className="sidebar-scrim" onClick={() => setOpen(false)} />}
       <main className="main-content">
         <header className="topbar">
-          <button className="icon-button menu-button" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu /></button>
+          <button className="icon-button menu-button mobile-only" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu /></button>
+          <div className="topbar-brand">
+            <img src="/proplattice-logo.png" alt="PropLattice" />
+            <span>PROPLATTICE</span>
+          </div>
           <div className="top-actions">
+            <div className="header-profile">
+              <div className="avatar">{(user?.name || "U").slice(0, 1)}</div>
+              <span>{user?.name || "Outside Sales"}</span>
+            </div>
             <button className="text-button" onClick={() => { signOut(); navigate("/") }}>Log out</button>
           </div>
         </header>

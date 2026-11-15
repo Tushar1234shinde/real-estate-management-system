@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Filter, X } from "lucide-react";
+import { CheckCircle, Filter, Users, X, XCircle } from "lucide-react";
 import { adminAttendanceApi } from "../api/attendance.js";
-import { formatDateTime, formatDate, enumLabel, toNumericId } from "../utils/apiMappers.js";
+import { formatDateTime, enumLabel, toNumericId } from "../utils/apiMappers.js";
 
 function messageFor(error) {
   return error?.message || "The request could not be completed.";
@@ -20,18 +20,6 @@ function statusLabel(status) {
   }
 }
 
-function statusColor(status) {
-  switch (status) {
-    case "LOGGED_IN":
-      return "var(--green)";
-    case "LOGGED_OUT":
-      return "var(--red)";
-    case "AUTO_LOGGED_OUT":
-      return "var(--orange)";
-    default:
-      return "var(--muted)";
-  }
-}
 
 export function AdminAttendance() {
   const [attendance, setAttendance] = useState([]);
@@ -97,14 +85,12 @@ export function AdminAttendance() {
   const ATTENDANCE_STATUSES = ["LOGGED_IN", "LOGGED_OUT", "AUTO_LOGGED_OUT"];
 
   return (
-    <div className="card admin-attendance-card">
+    <div className="admin-attendance-wrapper">
       <div className="page-heading">
         <div>
           <span className="eyebrow">ATTENDANCE REPORTING</span>
-          <h2>Attendance Reports</h2>
-          <p className="muted">
-            Monitor employee attendance across the organization.
-          </p>
+          <h1>Attendance Reports</h1>
+          <p className="muted">Monitor employee attendance across the organization.</p>
         </div>
       </div>
 
@@ -126,18 +112,21 @@ export function AdminAttendance() {
         ) : (
           <div className="stats-grid">
             <div className="stat-card">
+              <div className="stat-icon"><Users size={22} /></div>
               <div className="stat-copy">
                 <span>Total Employees</span>
                 <strong>{summary?.summary?.totalEmployees ?? 0}</strong>
               </div>
             </div>
             <div className="stat-card">
+              <div className="stat-icon" style={{ color: "var(--green)" }}><CheckCircle size={22} /></div>
               <div className="stat-copy">
                 <span>Checked In</span>
                 <strong style={{ color: "var(--green)" }}>{summary?.summary?.checkedIn ?? 0}</strong>
               </div>
             </div>
             <div className="stat-card">
+              <div className="stat-icon" style={{ color: "var(--red)" }}><XCircle size={22} /></div>
               <div className="stat-copy">
                 <span>Not Checked In</span>
                 <strong style={{ color: "var(--red)" }}>{summary?.summary?.notCheckedIn ?? 0}</strong>
@@ -150,7 +139,14 @@ export function AdminAttendance() {
           <div className="by-status">
             <span className="muted">By status:</span>
             {Object.entries(summary.summary.byStatus).map(([status, count]) => (
-              <span key={status} className={`status-chip`} style={{ color: statusColor(status) }}>
+              <span
+                key={status}
+                className={`status-badge ${
+                  status === "LOGGED_IN" ? "status-active" :
+                  status === "LOGGED_OUT" ? "status-inactive" :
+                  "status-pending"
+                }`}
+              >
                 {statusLabel(status)}: {count}
               </span>
             ))}
@@ -177,7 +173,7 @@ export function AdminAttendance() {
           <h3>Attendance Records</h3>
         </div>
 
-        <div className="filter-toolbar">
+        <div className="call-logs-filter-grid">
           <label className="field-label">
             Employee
             <input
@@ -205,19 +201,22 @@ export function AdminAttendance() {
             To
             <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
           </label>
-          <button className="secondary-button" onClick={loadAttendance}>
-            <Filter size={16} /> Apply
-          </button>
-          <button className="text-button" onClick={() => {
-            setFilterEmployeeId("");
-            setFilterStatus("");
-            setFilterFrom("");
-            setFilterTo("");
-            setPage(1);
-            loadAttendance();
-          }}>
-            <X size={16} /> Clear
-          </button>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+            <button className="secondary-button" onClick={loadAttendance}>
+              <Filter size={16} /> Apply
+            </button>
+            {(filterEmployeeId || filterStatus || filterFrom || filterTo) && (
+              <button className="text-button" onClick={() => {
+                setFilterEmployeeId("");
+                setFilterStatus("");
+                setFilterFrom("");
+                setFilterTo("");
+                setPage(1);
+              }}>
+                <X size={16} /> Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -225,7 +224,7 @@ export function AdminAttendance() {
         ) : attendance.length === 0 ? (
           <div className="empty-state">
             <h3>No attendance records</h3>
-            <p>No records match the current filters.</p>
+            <p>{(filterEmployeeId || filterStatus || filterFrom || filterTo) ? "No records match the current filters. Try adjusting your search." : "No attendance records found."}</p>
           </div>
         ) : (
           <div className="table-scroll">
@@ -250,13 +249,17 @@ export function AdminAttendance() {
                       <span className="muted">{record.employee?.email || ""}</span>
                     </td>
                     <td data-label="Role">{enumLabel(record.employee?.role?.name || record.employee?.role)}</td>
-                    <td data-label="Check-in">{formatDateTime(record.loginTime)}</td>
-                    <td data-label="Check-out">{record.logoutTime ? formatDateTime(record.logoutTime) : "—"}</td>
+                    <td data-label="Check-in" style={{ whiteSpace: "nowrap" }}>{formatDateTime(record.loginTime)}</td>
+                    <td data-label="Check-out" style={{ whiteSpace: "nowrap" }}>{record.logoutTime ? formatDateTime(record.logoutTime) : "—"}</td>
                     <td data-label="Duration">
                       {record.workingDurationMinutes !== null ? formatDuration(record.workingDurationMinutes) : "—"}
                     </td>
                     <td data-label="Status">
-                      <span className={`status-badge`} style={{ color: statusColor(record.status) }}>
+                      <span className={`status-badge ${
+                        record.status === "LOGGED_IN" ? "status-active" :
+                        record.status === "LOGGED_OUT" ? "status-inactive" :
+                        "status-pending"
+                      }`}>
                         {statusLabel(record.status)}
                       </span>
                     </td>
@@ -268,11 +271,10 @@ export function AdminAttendance() {
           </div>
         )}
 
-        {pagination && (
+        {pagination && pagination.totalPages > 1 && (
           <div className="pagination">
             <span>
-              Page {pagination.page} of {pagination.totalPages || 1} ·
-              {pagination.total} records
+              Page {pagination.page} of {pagination.totalPages || 1} · {pagination.total} records
             </span>
             <div>
               <button

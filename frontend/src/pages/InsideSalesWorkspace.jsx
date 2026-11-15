@@ -8,6 +8,7 @@ import { CustomerCallLogs } from "../components/CustomerCallLogs.jsx"
 import { PropertyDocuments } from "../components/PropertyDocuments.jsx"
 import { EmployeeAttendance } from "../components/EmployeeAttendance.jsx"
 import { AnnouncementList } from "../components/AnnouncementList.jsx"
+import { CustomerWhatsApp } from "../components/CustomerWhatsApp.jsx"
 
 const nav = [
   ["overview", "Overview", Home], ["customers", "Assigned Customers", Contact],
@@ -23,28 +24,308 @@ function Failure({ message, retry }) { return <div className="empty-state"><h3>U
 function Empty({ title, text }) { return <div className="empty-state"><h3>{title}</h3><p>{text}</p></div> }
 
 function Shell({ section, children, profile }) {
-  const { signOut } = useAuth(); const navigate = useNavigate(); const [open, setOpen] = useState(false)
-  return <div className="app-shell">
-    <aside className={`sidebar ${open ? "open" : ""}`}><div className="sidebar-top"><div className="app-logo"><img src="/proplattice-logo.png" alt="PropLattice" /><div>PROPLATTICE<small>REAL ESTATE, IN SYNC</small></div></div><button className="icon-button mobile-only" onClick={() => setOpen(false)} aria-label="Close navigation"><X /></button></div>
-      <nav aria-label="Workspace navigation"><span className="nav-heading">WORKSPACE</span>{nav.map(([id, label, Icon]) => <NavLink key={id} to={`/app/inside-sales/${id}`} onClick={() => setOpen(false)} className={section === id ? "active" : ""}><Icon /><span>{label}</span></NavLink>)}</nav>
-      <div className="sidebar-user"><div className="avatar">{(profile?.fullName || "U").slice(0, 1)}</div><div><strong>{profile?.fullName || "Inside Sales"}</strong><small>Inside Sales Employee</small></div></div>
-    </aside>
-    <main className="main-content"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)} aria-label="Open navigation"><Menu /></button><div className="top-actions"><button className="text-button" onClick={() => { signOut(); navigate("/") }}>Log out</button></div></header>{children}</main>
-  </div>
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const initials = (name) => (name ? name.slice(0, 1).toUpperCase() : "U");
+
+  return (
+    <div className="app-shell">
+      {open && <div className="sidebar-scrim" onClick={() => setOpen(false)} />}
+      <aside className={`sidebar ${open ? "open" : ""}`}>
+        <div className="sidebar-top">
+          <div className="app-logo">
+            <img src="/proplattice-logo.png" alt="PropLattice" />
+            <div>
+              PROPLATTICE<small>REAL ESTATE, IN SYNC</small>
+            </div>
+          </div>
+          <button
+            className="icon-button mobile-only"
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X />
+          </button>
+        </div>
+        <nav aria-label="Workspace navigation">
+          <span className="nav-heading">WORKSPACE</span>
+          {nav.map(([id, label, Icon]) => (
+            <NavLink
+              key={id}
+              to={`/app/inside-sales/${id}`}
+              onClick={() => setOpen(false)}
+              className={section === id ? "active" : ""}
+            >
+              <Icon />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <div className="sidebar-user">
+          <div className="avatar">{initials(profile?.fullName)}</div>
+          <div>
+            <strong>{profile?.fullName || "Inside Sales"}</strong>
+            <small>Inside Sales Employee</small>
+          </div>
+        </div>
+      </aside>
+      <div className="app-main">
+        <header className="topbar">
+          <button
+            className="icon-button menu-button mobile-only"
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu />
+          </button>
+          <div className="app-logo topbar-brand">
+            <img src="/proplattice-logo.png" alt="PropLattice" />
+            <span>PROPLATTICE</span>
+          </div>
+          <div className="top-actions">
+            <button
+              className="text-button"
+              onClick={() => {
+                signOut();
+                navigate("/");
+              }}
+            >
+              Log out
+            </button>
+            <div className="header-profile">
+              <div className="avatar">{initials(profile?.fullName)}</div>
+              <span>
+                <strong>{profile?.fullName || "Account"}</strong>
+                <small>Inside Sales</small>
+              </span>
+            </div>
+          </div>
+        </header>
+        <main className="content">{children}</main>
+      </div>
+    </div>
+  );
 }
 
-function Customers({ interestStatus, onOpen }) {
-  const [state, setState] = useState({ loading: true, error: "", customers: [], pagination: null }); const [page, setPage] = useState(1)
-  const load = useCallback(async () => { setState(s => ({ ...s, loading: true, error: "" })); try { const data = await insideSalesApi.listCustomers({ page, pageSize: 50 }); const customers = (data.customers || []).filter(c => !interestStatus || c.interestStatus === interestStatus); setState({ loading: false, error: "", customers, pagination: data.pagination }) } catch (error) { setState({ loading: false, error: messageFor(error), customers: [], pagination: null }) } }, [page, interestStatus])
-  useEffect(() => { load() }, [load])
-  if (state.loading) return <Loading />; if (state.error) return <Failure message={state.error} retry={load} />
-  return <section className="card data-page-card"><div className="table-scroll"><table><thead><tr><th>Customer</th><th>Phone</th><th>Interest</th><th /></tr></thead><tbody>{state.customers.map(customer => <tr key={customer.id}><td><strong>{customer.fullName}</strong><span>{customer.email || "No email"}</span></td><td>{customer.phone || "—"}</td><td>{enumLabel(customer.interestStatus)}</td><td><button className="secondary-button" onClick={() => onOpen(customer)}>Details</button></td></tr>)}</tbody></table></div>{!state.customers.length && <Empty title="No customers found" text="There are no assigned customers in this view." />}{state.pagination?.totalPages > 1 && <div className="pagination"><span>Page {page} of {state.pagination.totalPages}</span><div><button className="secondary-button" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><button className="secondary-button" disabled={page >= state.pagination.totalPages} onClick={() => setPage(page + 1)}>Next</button></div></div>}</section>
+function Customers({ interestStatus, onOpen, onWhatsApp }) {
+  const [state, setState] = useState({ loading: true, error: "", customers: [], pagination: null });
+  const [page, setPage] = useState(1);
+  const load = useCallback(async () => {
+    setState((s) => ({ ...s, loading: true, error: "" }));
+    try {
+      const data = await insideSalesApi.listCustomers({ page, pageSize: 50 });
+      const customers = (data.customers || []).filter(
+        (c) => !interestStatus || c.interestStatus === interestStatus
+      );
+      setState({ loading: false, error: "", customers, pagination: data.pagination });
+    } catch (error) {
+      setState({ loading: false, error: messageFor(error), customers: [], pagination: null });
+    }
+  }, [page, interestStatus]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (state.loading) return <Loading />;
+  if (state.error) return <Failure message={state.error} retry={load} />;
+
+  return (
+    <section className="card data-page-card">
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>Interest</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.customers.map((customer) => (
+              <tr key={customer.id}>
+                <td data-label="Customer">
+                  <strong>{customer.fullName}</strong>
+                  <span>{customer.email || "No email"}</span>
+                </td>
+                <td data-label="Phone">{customer.phone || "—"}</td>
+                <td data-label="Interest">
+                  <span className={`status-badge ${customer.interestStatus === "INTERESTED" ? "status-interested" : customer.interestStatus === "NOT_INTERESTED" ? "status-not-interested" : "status-pending"}`}>
+                    {enumLabel(customer.interestStatus)}
+                  </span>
+                </td>
+                <td data-label="Actions">
+                  <div className="table-actions">
+                    <button className="secondary-button" onClick={() => onOpen(customer)}>
+                      Details
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => onWhatsApp && onWhatsApp(customer)}
+                    >
+                      WhatsApp
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!state.customers.length && (
+        <Empty title="No customers found" text="There are no assigned customers in this view." />
+      )}
+      {state.pagination?.totalPages > 1 && (
+        <div className="pagination">
+          <span>Page {page} of {state.pagination.totalPages}</span>
+          <div>
+            <button
+              className="secondary-button"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              Previous
+            </button>
+            <button
+              className="secondary-button"
+              disabled={page >= state.pagination.totalPages}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
-function CustomerDetails({ customer, onClose, refresh, onSchedule }) {
-  const [current, setCurrent] = useState(customer); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [messageStatus, setMessageStatus] = useState("")
-  async function updateInterest(interestStatus) { setSaving(true); setError(""); setMessageStatus(""); try { const data = await insideSalesApi.updateInterest(current.id, interestStatus); setCurrent(data.customer); const key = `outcome-${current.id}-${interestStatus}-${new Date(data.customer.updatedAt).getTime()}`; try { const outcome = await insideSalesApi.sendOutcomeWhatsApp(current.id, interestStatus, { headers: { "Idempotency-Key": key } }); setMessageStatus(outcome.queued ? "WhatsApp message queued." : outcome.acceptedByProvider ? "WhatsApp message sent." : "WhatsApp message status updated.") } catch (messageError) { setMessageStatus(`WhatsApp blocked: ${messageFor(messageError)}`) } refresh() } catch (e) { setError(messageFor(e)) } finally { setSaving(false) } }
-  return <div className="modal-backdrop"><div className="modal customer-drawer"><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><X /></button><span className="eyebrow">ASSIGNED CUSTOMER</span><h2>{current.fullName}</h2><p>{current.phone || "No phone number"} · {current.email || "No email"}</p>{error && <div className="inline-warning">{error}</div>}{messageStatus && <div className="toast-message">{messageStatus}</div>}<div className="modal-footer" style={{ flexWrap: "wrap", gap: "8px" }}><button className="secondary-button" disabled={saving} onClick={() => updateInterest("INTERESTED")}>Mark Interested</button><button className="secondary-button" disabled={saving} onClick={() => updateInterest("NOT_INTERESTED")}>Mark Not Interested</button>{onSchedule && <button className="primary-button" onClick={() => { onClose(); onSchedule(current); }}>Schedule Property Visit</button>}</div><CustomerCallLogs customerId={current.id} role="INSIDE_SALES" /></div></div>
+function CustomerDetails({ customer, onClose, refresh, onSchedule, onWhatsApp }) {
+  const [current, setCurrent] = useState(customer);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [properties, setProperties] = useState([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState("");
+
+  useEffect(() => {
+    insideSalesApi
+      .listAvailableProperties({ page: 1, pageSize: 100 })
+      .then((data) => setProperties(data.properties || []))
+      .catch(() => {});
+  }, []);
+
+  const selectedProperty = useMemo(() => {
+    return properties.find((p) => p.id === Number(selectedPropertyId)) || null;
+  }, [properties, selectedPropertyId]);
+
+  async function updateInterest(interestStatus) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const data = await insideSalesApi.updateInterest(current.id, interestStatus);
+      setCurrent(data.customer);
+
+      if (selectedProperty) {
+        await insideSalesApi
+          .createCallLog(current.id, {
+            outcome: interestStatus,
+            propertyId: selectedProperty.id,
+            notes: `Interest marked as ${enumLabel(interestStatus)} for ${selectedProperty.title}`,
+          })
+          .catch(() => {});
+      }
+
+      setSuccess(`Interest status updated to ${enumLabel(interestStatus)}.`);
+      refresh();
+
+      // Offer WhatsApp Click-to-Chat with the property documents & prefilled message
+      if (onWhatsApp) {
+        onClose();
+        onWhatsApp(data.customer, selectedProperty, interestStatus);
+      }
+    } catch (e) {
+      setError(messageFor(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal customer-drawer">
+        <button className="icon-button modal-close" onClick={onClose} aria-label="Close">
+          <X />
+        </button>
+        <span className="eyebrow">ASSIGNED CUSTOMER</span>
+        <h2>{current.fullName}</h2>
+        <p>{current.phone || "No phone number"} · {current.email || "No email"}</p>
+
+        <div style={{ marginTop: "12px", marginBottom: "14px" }}>
+          <label className="field-label">
+            Property Discussed / Inquired
+            <select
+              value={selectedPropertyId}
+              onChange={(e) => setSelectedPropertyId(e.target.value)}
+              style={{ width: "100%", padding: "7px 10px", borderRadius: "8px", border: "1px solid #cbd5e1", marginTop: "4px" }}
+            >
+              <option value="">Select a property…</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title} ({p.location})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {error && <div className="inline-warning">{error}</div>}
+        {success && <div className="toast-message">{success}</div>}
+
+        <div className="modal-footer" style={{ flexWrap: "wrap", gap: "8px" }}>
+          <button
+            className="secondary-button"
+            disabled={saving}
+            onClick={() => updateInterest("INTERESTED")}
+          >
+            Mark Interested
+          </button>
+          <button
+            className="secondary-button"
+            disabled={saving}
+            onClick={() => updateInterest("NOT_INTERESTED")}
+          >
+            Mark Not Interested
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onWhatsApp) onWhatsApp(current, selectedProperty, current.interestStatus);
+            }}
+          >
+            WhatsApp
+          </button>
+          {onSchedule && (
+            <button
+              className="primary-button"
+              onClick={() => {
+                onClose();
+                onSchedule(current);
+              }}
+            >
+              Schedule Property Visit
+            </button>
+          )}
+        </div>
+        <CustomerCallLogs customerId={current.id} role="INSIDE_SALES" />
+      </div>
+    </div>
+  );
 }
 
 function Properties() {
@@ -185,7 +466,15 @@ function Schedules({ initialCustomer, onClearInitialCustomer }) {
                   <td data-label="Property">{s.property?.title || `Property #${s.propertyId}`}</td>
                   <td data-label="Outside Sales">{s.outsideSalesEmployee?.fullName || `Employee #${s.outsideSalesEmployeeId}`}</td>
                   <td data-label="Scheduled">{formatDateTime(s.scheduledAt)}</td>
-                  <td data-label="Status">{enumLabel(s.status)}</td>
+                  <td data-label="Status">
+                    <span className={`status-badge ${
+                      s.status === "SCHEDULED" ? "status-scheduled" :
+                      s.status === "COMPLETED" ? "status-completed" :
+                      s.status === "CANCELLED" ? "status-cancelled" :
+                      s.status === "RESCHEDULED" ? "status-rescheduled" :
+                      "status-pending"
+                    }`}>{enumLabel(s.status)}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -309,6 +598,15 @@ export default function InsideSalesWorkspace() {
   const [selected, setSelected] = useState(null);
   const [customerToSchedule, setCustomerToSchedule] = useState(null);
   const [customersRefreshKey, setCustomersRefreshKey] = useState(0);
+  const [whatsappState, setWhatsappState] = useState(null);
+
+  const handleOpenWhatsApp = (customer, property = null, interestStatus = null) => {
+    setWhatsappState({
+      customer,
+      property,
+      interestStatus: interestStatus || customer?.interestStatus,
+    });
+  };
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -329,7 +627,14 @@ export default function InsideSalesWorkspace() {
 
   let content;
   if (section === "customers" || section === "interested" || section === "not-interested") {
-    content = <Customers key={customersRefreshKey} interestStatus={section === "interested" ? "INTERESTED" : section === "not-interested" ? "NOT_INTERESTED" : null} onOpen={setSelected} />;
+    content = (
+      <Customers
+        key={customersRefreshKey}
+        interestStatus={section === "interested" ? "INTERESTED" : section === "not-interested" ? "NOT_INTERESTED" : null}
+        onOpen={setSelected}
+        onWhatsApp={handleOpenWhatsApp}
+      />
+    );
   } else if (section === "assignments" || section === "visits") {
     content = (
       <>
@@ -356,7 +661,7 @@ export default function InsideSalesWorkspace() {
   } else if (section === "announcements") {
     content = <AnnouncementList role="INSIDE_SALES" />;
   } else if (section === "calls") {
-    content = <Customers onOpen={setSelected} />;
+    content = <Customers onOpen={setSelected} onWhatsApp={handleOpenWhatsApp} />;
   } else if (section === "profile") {
     content = loading ? <Loading label="Loading profile…" /> : error ? <Failure message={error} retry={loadOverview} /> : (
       <section className="card data-page-card">
@@ -389,7 +694,29 @@ export default function InsideSalesWorkspace() {
             setCustomerToSchedule(cust);
             navigate("/app/inside-sales/visits");
           }}
+          onWhatsApp={handleOpenWhatsApp}
         />
+      )}
+      {whatsappState && (
+        <div className="modal-backdrop">
+          <div className="modal whatsapp-modal">
+            <button
+              className="icon-button modal-close"
+              onClick={() => setWhatsappState(null)}
+              aria-label="Close"
+            >
+              <X />
+            </button>
+            <CustomerWhatsApp
+              customerId={whatsappState.customer?.id}
+              customer={whatsappState.customer}
+              property={whatsappState.property}
+              interestStatus={whatsappState.interestStatus}
+              role="INSIDE_SALES"
+              onClose={() => setWhatsappState(null)}
+            />
+          </div>
+        </div>
       )}
     </Shell>
   );
