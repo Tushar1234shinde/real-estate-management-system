@@ -111,8 +111,13 @@ async function cleanupUploadedAssets(client, assets) {
 
 function mapUploadResult(uploaded, file, validatedFile, publicId) {
     const expectedResourceType = validatedFile.resourceType;
+    const matchesPublicId = uploaded?.public_id === publicId
+        || (typeof uploaded?.public_id === "string" && (
+            uploaded.public_id.endsWith(`/${publicId}`) || uploaded.public_id.endsWith(publicId)
+        ));
+
     if (!uploaded
-        || uploaded.public_id !== publicId
+        || !matchesPublicId
         || uploaded.resource_type !== expectedResourceType
         || uploaded.type !== "authenticated"
         || typeof uploaded.secure_url !== "string"

@@ -545,3 +545,166 @@ tbody tr:hover { background: #fbfdff; }
 .login-page { background: #fffefd; }.login-brand { background: radial-gradient(circle at 92% 10%, rgba(216,188,125,.28), transparent 28%), radial-gradient(circle at 10% 95%, rgba(15,118,110,.30), transparent 36%), linear-gradient(145deg, #0e1929 0%, #172b42 55%, #0b615c 130%); }.login-brand::before { border-color: rgba(216,188,125,.38); box-shadow: 0 0 0 90px rgba(216,188,125,.05), 0 0 0 180px rgba(216,188,125,.025); }.login-brand-logo { border-radius: 16px; box-shadow: 0 14px 32px rgba(0,0,0,.25); }.login-story h1 { font-weight: 750; }.login-story > p { color: #c4ced2; }.promise-list svg { color: #d8bc7d; }.login-box { max-width: 440px; }.login-box h2 { color: #1b293a; font-size: 32px; }.login-panel { background: linear-gradient(135deg, #fffefd, #faf7f0); }.secure-note { color: #718078; }
 @media (max-width:980px) { .app-main { margin-left: 0; }.sidebar { width: 272px; } }
 @media (max-width:700px) { .content { padding: 27px 16px 86px; }.topbar { height: 66px; padding: 0 16px; }.topbar-brand { display: none; }.page-heading { margin-bottom: 22px; padding-bottom: 18px; }.page-heading h1 { font-size: 25px; }.card, .stat-card { border-radius: 14px; }.entity-form { padding: 21px; } }
+
+/* Admin/Executive workspace mobile sidebar drawer - hamburger + close button visibility */
+.sidebar.mobile-only { display: none; }
+.menu-button.mobile-only { display: none; }
+
+@media (max-width: 700px) {
+  .sidebar.mobile-only { display: block; }
+  .menu-button.mobile-only { display: block; }
+  .app-main { width: 100%; margin-left: 0; }
+}
+
+/* Safe area for notched devices (iPhone etc.) */
+.content {
+  padding-bottom: calc(86px + env(safe-area-inset-bottom));
+}
+.toast-message {
+  bottom: calc(22px + env(safe-area-inset-bottom));
+}
+
+/* Responsive tables - card view on mobile instead of horizontal scroll */
+@media (max-width: 700px) {
+  .table-scroll table,
+  .table-scroll thead,
+  .table-scroll tbody,
+  .table-scroll th,
+  .table-scroll td,
+  .table-scroll tr {
+    display: block;
+  }
+  .table-scroll thead {
+    display: none;
+  }
+  .table-scroll tr {
+    margin-bottom: 14px;
+    padding: 16px;
+    border: 1px solid #e2e9f2;
+    border-radius: 10px;
+    background: white;
+  }
+  .table-scroll td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f3f7;
+  }
+  .table-scroll td:last-child {
+    border-bottom: none;
+  }
+  .table-scroll td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6f7785;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    min-width: 40%;
+  }
+  .table-scroll td.status-badge,
+  .table-scroll td .status-badge {
+    justify-content: flex-start;
+  }
+  .table-scroll .row-actions {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    min-width: auto;
+  }
+  .table-scroll .row-actions button {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+
+/* ==========================================================================
+   PRE-SUBMISSION UI ENHANCEMENTS & RESPONSIVE POLISH
+   ========================================================================== */
+
+/* 1. Property Documents modal sizing and table responsiveness */
+.modal-card:has(.property-documents-card),
+.modal:has(.property-documents-card) {
+  max-width: 880px;
+  width: min(880px, 95vw);
+}
+
+.property-documents-card {
+  width: 100%;
+}
+
+.property-documents-card .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.property-documents-card table {
+  min-width: 580px;
+}
+
+.property-documents-card .doc-name {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* 2. Customer, employee, and property name/email spacing */
+td > strong,
+td > div > strong {
+  display: block;
+  color: #233044;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+td > strong + span,
+td > div > strong + span {
+  display: block;
+  color: #7b889b;
+  font-size: 10px;
+  margin-top: 3px;
+  line-height: 1.25;
+}
+
+/* 3. Modal positioning and scrolling */
+.modal-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-card,
+.modal {
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 700px) {
+  .modal-backdrop {
+    padding: 12px;
+    align-items: flex-start;
+  }
+  .modal-card,
+  .modal {
+    max-height: 92vh;
+    margin: 8px 0;
+    width: 100%;
+  }
+  .property-documents-card table {
+    min-width: 100%;
+  }
+  .property-documents-card .doc-name {
+    max-width: 150px;
+  }
+}

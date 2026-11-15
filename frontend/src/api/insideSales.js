@@ -7,6 +7,7 @@ export const insideSalesApi = {
   createCallLog: (customerId, body, options) => apiRequest(`/api/inside-sales/customers/${customerId}/call-logs`, { method: "POST", body, ...options }),
   updateInterest: (customerId, interestStatus, options) => apiRequest(`/api/inside-sales/customers/${customerId}/interest`, { method: "PATCH", body: { interestStatus }, ...options }),
   listAvailableProperties: (query, options) => apiRequest("/api/inside-sales/properties", { query, ...options }),
+  listOutsideSalesAgents: (options) => apiRequest("/api/inside-sales/outside-sales-agents", options),
   listVisitSchedules: (query, options) => apiRequest("/api/inside-sales/visit-schedules", { query, ...options }),
   createVisitSchedule: (body, options) => apiRequest("/api/inside-sales/visit-schedules", { method: "POST", body, ...options }),
   updateVisitSchedule: (scheduleId, body, options) => apiRequest(`/api/inside-sales/visit-schedules/${scheduleId}`, { method: "PATCH", body, ...options }),

@@ -40,6 +40,7 @@ export function createInsideSalesRouter({
     router.post("/visit-schedules", ...insideSalesOnly, asyncHandler(controller.createVisitSchedule));
     router.patch("/visit-schedules/:scheduleId", ...insideSalesOnly, asyncHandler(controller.updateVisitSchedule));
     router.get("/dashboard", ...insideSalesOnly, asyncHandler(controller.dashboard));
+    router.get("/outside-sales-agents", ...insideSalesOnly, asyncHandler(controller.listOutsideSalesAgents));
     router.get("/profile", ...insideSalesOnly, asyncHandler(controller.profile));
 
     return router;

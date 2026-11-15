@@ -31,8 +31,13 @@ function formatFileSize(bytes) {
   return `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function normalizeRole(role) {
+  return String(role || "").toUpperCase().replace(/-/g, "_");
+}
+
 function isManageableRole(role) {
-  return role === "ADMIN" || role === "EXECUTIVE";
+  const normalized = normalizeRole(role);
+  return normalized === "ADMIN" || normalized === "EXECUTIVE";
 }
 
 export function PropertyDocuments({
@@ -41,9 +46,10 @@ export function PropertyDocuments({
   user,
   onClose,
 }) {
-  const isManageable = isManageableRole(role);
-  const api = role === "ADMIN" ? adminApi : executiveApi;
-  const salesApi = role === "INSIDE_SALES" ? insideSalesApi : outsideSalesApi;
+  const normalizedRole = normalizeRole(role || user?.role);
+  const isManageable = isManageableRole(normalizedRole);
+  const api = normalizedRole === "ADMIN" ? adminApi : executiveApi;
+  const salesApi = normalizedRole === "INSIDE_SALES" ? insideSalesApi : outsideSalesApi;
 
   const [documents, setDocuments] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -62,7 +68,7 @@ export function PropertyDocuments({
     setError("");
     try {
       const data =
-        role === "ADMIN" || role === "EXECUTIVE"
+        isManageable
           ? await api.listDocuments(propertyId, { page, pageSize: 20 })
           : await salesApi.listDocuments(propertyId, { page, pageSize: 20 });
       setDocuments(data.documents || []);
@@ -73,7 +79,7 @@ export function PropertyDocuments({
     } finally {
       setLoading(false);
     }
-  }, [api, salesApi, propertyId, role, page]);
+  }, [api, salesApi, propertyId, isManageable, page]);
 
   useEffect(() => {
     loadDocuments();
@@ -129,7 +135,7 @@ export function PropertyDocuments({
     setAccessLoading({ [document.id]: true });
     try {
       const data =
-        role === "ADMIN" || role === "EXECUTIVE"
+        isManageable
           ? await api.getDocumentAccess(propertyId, document.id)
           : await salesApi.getDocumentAccess(propertyId, document.id);
       const url = data.url;
@@ -177,7 +183,7 @@ export function PropertyDocuments({
         </div>
         {isManageable && (
           <div className="documents-actions">
-            <label className="field-label upload-trigger" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", minHeight: "auto", padding: 0 }}>
+            <label className="primary-button upload-trigger" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}>
               <Plus size={16} />
               Upload
               <input
@@ -223,7 +229,7 @@ export function PropertyDocuments({
             <tbody>
               {documents.map((doc) => (
                 <tr key={doc.id}>
-                  <td>
+                  <td data-label="Document">
                     <div className="doc-row">
                       <span className="doc-icon">
                         {doc.mimeType === "application/pdf" ? (
@@ -235,23 +241,23 @@ export function PropertyDocuments({
                       <span className="doc-name">{doc.documentName}</span>
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Type">
                     <span className="doc-type">{formatMimeLabel(doc.mimeType)}</span>
                   </td>
-                  <td>
+                  <td data-label="Size">
                     <span className="doc-size">
                       {doc.fileSizeBytes ? formatFileSize(Number(doc.fileSizeBytes)) : "—"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Uploaded By">
                     <span className="doc-uploader">
                       {doc.uploadedBy?.fullName || "Unknown"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Date">
                     <span className="doc-date">{formatDate(doc.uploadedAt)}</span>
                   </td>
-                  <td className="row-actions">
+                  <td data-label="Actions" className="row-actions">
                     <button
                       className="secondary-button"
                       disabled={accessLoading[doc.id]}

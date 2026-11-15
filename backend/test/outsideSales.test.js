@@ -341,7 +341,7 @@ const prismaClient = {
     },
 };
 
-const app = createApp({ prismaClient, jwtConfig, cloudinaryClient });
+const app = createApp({ prismaClient, jwtConfig, cloudinaryClient, environment: {} });
 let server;
 let baseUrl;
 

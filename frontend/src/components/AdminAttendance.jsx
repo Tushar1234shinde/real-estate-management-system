@@ -244,23 +244,23 @@ export function AdminAttendance() {
               <tbody>
                 {attendance.map((record) => (
                   <tr key={record.id}>
-                    <td>
+                    <td data-label="Employee">
                       <strong>{record.employee?.fullName || "Unknown"}</strong>
                       <br />
                       <span className="muted">{record.employee?.email || ""}</span>
                     </td>
-                    <td>{enumLabel(record.employee?.role?.name || record.employee?.role)}</td>
-                    <td>{formatDateTime(record.loginTime)}</td>
-                    <td>{record.logoutTime ? formatDateTime(record.logoutTime) : "—"}</td>
-                    <td>
+                    <td data-label="Role">{enumLabel(record.employee?.role?.name || record.employee?.role)}</td>
+                    <td data-label="Check-in">{formatDateTime(record.loginTime)}</td>
+                    <td data-label="Check-out">{record.logoutTime ? formatDateTime(record.logoutTime) : "—"}</td>
+                    <td data-label="Duration">
                       {record.workingDurationMinutes !== null ? formatDuration(record.workingDurationMinutes) : "—"}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`status-badge`} style={{ color: statusColor(record.status) }}>
                         {statusLabel(record.status)}
                       </span>
                     </td>
-                    <td>{record.officeLocation?.officeName || "—"}</td>
+                    <td data-label="Office">{record.officeLocation?.officeName || "—"}</td>
                   </tr>
                 ))}
               </tbody>

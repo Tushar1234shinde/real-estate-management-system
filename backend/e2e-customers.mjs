@@ -60,8 +60,10 @@ const { status: s5 } = await req(`/api/admin/customers/${customerId}`, {
 assert(s5 === 200, "Update customer -> 200");
 
 // Assign customer to inside sales
+const { data: empData } = await req("/api/admin/employees?role=INSIDE_SALES&isActive=true", { token: adminToken });
+const insideSalesEmployeeId = empData?.employees?.[0]?.id ?? 2;
 const { status: s6, data: d6 } = await req(`/api/admin/customers/${customerId}/assignment`, {
-  method: "POST", token: adminToken, body: { insideSalesEmployeeId: 2 }, // use inside sales user ID
+  method: "POST", token: adminToken, body: { insideSalesEmployeeId },
 });
 assert(s6 === 200 || s6 === 201, `Assign customer -> 200/201 (got ${s6})`);
 

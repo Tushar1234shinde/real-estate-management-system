@@ -166,16 +166,16 @@ export function AdminOfficeLocations() {
             <tbody>
               {officeLocations.map((office) => (
                 <tr key={office.id}>
-                  <td><strong>{office.officeName}</strong></td>
-                  <td>{office.address || "—"}</td>
-                  <td>{office.latitude}, {office.longitude}</td>
-                  <td>{office.allowedRadiusMeters}</td>
-                  <td>
+                  <td data-label="Office Name"><strong>{office.officeName}</strong></td>
+                  <td data-label="Address">{office.address || "—"}</td>
+                  <td data-label="Coordinates">{office.latitude}, {office.longitude}</td>
+                  <td data-label="Radius (m)">{office.allowedRadiusMeters}</td>
+                  <td data-label="Status">
                     <span className={`status-badge`} style={{ color: statusColor(office.isActive) }}>
                       {office.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <button className="secondary-button" onClick={() => openEditModal(office)}>
                       <Save size={16} /> Edit
                     </button> {" "}

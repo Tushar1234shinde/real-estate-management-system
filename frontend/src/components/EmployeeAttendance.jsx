@@ -398,20 +398,20 @@ export function EmployeeAttendance() {
               <tbody>
                 {history.map((record) => (
                   <tr key={record.id}>
-                    <td>{formatDateTime(record.loginTime)}</td>
-                    <td>{formatDateTime(record.loginTime)}</td>
-                    <td>
+                    <td data-label="Date">{formatDateTime(record.loginTime)}</td>
+                    <td data-label="Check-in">{formatDateTime(record.loginTime)}</td>
+                    <td data-label="Check-out">
                       {record.logoutTime ? formatDateTime(record.logoutTime) : "—"}
                     </td>
-                    <td>
+                    <td data-label="Duration">
                       {record.workingDurationMinutes !== null ? formatDuration(record.workingDurationMinutes) : "—"}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`status-badge`} style={{ color: statusColor(record.status) }}>
                         {statusLabel(record.status)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Office">
                       {record.officeLocation?.officeName || "—"}
                     </td>
                   </tr>

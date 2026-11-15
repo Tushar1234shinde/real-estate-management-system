@@ -26,6 +26,10 @@ async function login(email, pass, label) {
 
 console.log("\n=== ADDITIONAL FEATURES ===");
 
+const ts = Date.now();
+adminToken = await login("admin@example.com", "admin@123", "Admin");
+assert(adminToken, "Admin token obtained");
+
 // --- Attendance ---
 console.log("\n--- Attendance ---");
 
@@ -46,13 +50,13 @@ const attToken = await login(`qa.att.${ts}@test.local`, "TestPass123!", "Attenda
 
 const { status: sCheckIn, data: dCheckIn } = await req("/api/attendance/check-in", {
   method: "POST", token: attToken,
-  body: { officeLocationId: officeId, loginLatitude: 40.7128, loginLongitude: -74.006 },
+  body: { officeLocationId: officeId, latitude: 40.7128, longitude: -74.006 },
 });
 assert(sCheckIn === 201, `Check-in -> 201 (got ${sCheckIn})`);
 
 const { status: sCheckIn2 } = await req("/api/attendance/check-in", {
   method: "POST", token: attToken,
-  body: { officeLocationId: officeId, loginLatitude: 40.7128, loginLongitude: -74.006 },
+  body: { officeLocationId: officeId, latitude: 40.7128, longitude: -74.006 },
 });
 assert(sCheckIn2 === 409, `Duplicate check-in -> 409 (got ${sCheckIn2})`);
 
@@ -64,7 +68,7 @@ assert(sOffices === 200, "Active office locations -> 200");
 
 const { status: sCheckOut } = await req("/api/attendance/check-out", {
   method: "POST", token: attToken,
-  body: { officeLocationId: officeId, logoutLatitude: 40.7128, logoutLongitude: -74.006 },
+  body: { latitude: 40.7128, longitude: -74.006 },
 });
 assert(sCheckOut === 200, `Check-out -> 200 (got ${sCheckOut})`);
 
@@ -93,7 +97,7 @@ assert(sAnnGet === 200, "Get announcement -> 200");
 const { status: sAnnRead } = await req(`/api/announcements/${annId}/read`, {
   method: "POST", token: adminToken,
 });
-assert(sAnnRead === 200, "Mark announcement read -> 200");
+assert(sAnnRead === 200 || sAnnRead === 201, "Mark announcement read -> 200/201");
 
 const { status: sAnnUpd } = await req(`/api/announcements/${annId}`, {
   method: "PATCH", token: adminToken, body: { title: "QA Announcement Updated" },

@@ -13,6 +13,8 @@ export function createAdminVisitReviewRouter({ prismaClient, jwtSecret, jwtIssue
     router.get("/visits/:visitId/review", ...protect, asyncHandler(controller.getReviewDetails));
     router.get("/visits/:visitId/evidence/:mediaId/access", ...protect, asyncHandler(controller.getEvidenceAccessUrl));
     router.patch("/visits/:visitId/approve", ...protect, asyncHandler(controller.approveVisit));
+    router.post("/visits/:visitId/approve", ...protect, asyncHandler(controller.approveVisit));
     router.patch("/visits/:visitId/reject", ...protect, asyncHandler(controller.rejectVisit));
+    router.post("/visits/:visitId/reject", ...protect, asyncHandler(controller.rejectVisit));
     return router;
 }

@@ -62,7 +62,7 @@ export async function apiRequest(path, { method = "GET", query, body, headers = 
           try { payload = JSON.parse(xhr.responseText) } catch { payload = null }
         }
 
-        if (!xhr.ok || (payload && payload.success === false)) {
+        if (!(xhr.status >= 200 && xhr.status < 300) || (payload && payload.success === false)) {
           if (xhr.status === 401) {
             clearAuthToken()
             window.dispatchEvent(new Event("auth:unauthorized"))

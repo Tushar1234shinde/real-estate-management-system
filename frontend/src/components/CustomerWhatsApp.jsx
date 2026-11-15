@@ -20,7 +20,7 @@ function getDeliveryStatusColor(status) {
 }
 
 export function CustomerWhatsApp({ customerId, role }) {
-  const isInsideSales = role === "inside-sales";
+  const isInsideSales = role === "inside-sales" || role === "INSIDE_SALES";
   const api = isInsideSales ? insideSalesApi : adminApi;
 
   const [messages, setMessages] = useState([]);
@@ -112,11 +112,11 @@ export function CustomerWhatsApp({ customerId, role }) {
               <tbody>
                 {messages.map((msg) => (
                   <tr key={msg.id}>
-                    <td>
+                    <td data-label="Message">
                       <span className="muted">{enumLabel(msg.messageType)}</span><br />
                       {msg.messageContent}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`status-badge`} style={{ color: getDeliveryStatusColor(msg.deliveryStatus) }}>
                         {enumLabel(msg.deliveryStatus)}
                       </span>
@@ -124,7 +124,7 @@ export function CustomerWhatsApp({ customerId, role }) {
                         <span className="muted"> · {msg.outbox.attemptCount} attempts</span>
                       )}
                     </td>
-                    <td>{formatDateTime(msg.sentAt || msg.createdAt)}</td>
+                    <td data-label="Sent At">{formatDateTime(msg.sentAt || msg.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>

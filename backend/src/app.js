@@ -152,6 +152,8 @@ export function createApp({
         jwtSecret: resolvedJwtConfig.secret,
         jwtIssuer: resolvedJwtConfig.issuer,
         jwtAudience: resolvedJwtConfig.audience,
+        cloudinaryClient,
+        environment,
     }));
     app.use("/api/admin", createAdminCustomerRouter({
         prismaClient,

@@ -1,6 +1,23 @@
 import bcrypt from "bcryptjs";
 import prisma from "../config/prisma.js";
 import { AppError } from "../errors/AppError.js";
+import { createCloudinaryClient } from "../config/cloudinary.js";
+import { validateEvidenceFile } from "../utils/evidence.js";
+
+const DEFAULT_PROFILE_IMAGE_FOLDER = "profile-images";
+
+function getProfileImageFolder(environment = process.env) {
+    return environment.CLOUDINARY_PROFILE_IMAGE_FOLDER?.trim() || DEFAULT_PROFILE_IMAGE_FOLDER;
+}
+
+function uploadStreamAsync(client, buffer, options) {
+    return new Promise((resolve, reject) => {
+        const stream = client.uploader.upload_stream(options, (error, result) =>
+            error ? reject(error) : resolve(result)
+        );
+        stream.end(buffer);
+    });
+}
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -163,7 +180,7 @@ async function roleIdFor(prismaClient, roleName) {
     return role.id;
 }
 
-export function createAdminEmployeeController({ prismaClient = prisma } = {}) {
+export function createAdminEmployeeController({ prismaClient = prisma, cloudinaryClient, environment } = {}) {
     return {
         listEmployees: async (req, res) => {
             const page = parsePositiveInteger(req.query.page, DEFAULT_PAGE, "page");
@@ -300,6 +317,19 @@ export function createAdminEmployeeController({ prismaClient = prisma } = {}) {
                 if (isTransactionConflict(error)) throw new AppError(409, "Employee assignment state changed; retry the status update.");
                 throw error;
             }
+        },
+        uploadProfileImage: async (req, res) => {
+            validateEvidenceFile(req.file, "selfie");
+            const client = cloudinaryClient ?? createCloudinaryClient(environment);
+            const folder = getProfileImageFolder(environment);
+            const result = await uploadStreamAsync(client, req.file.buffer, {
+                folder,
+                resource_type: "image",
+                type: "upload",
+            });
+            const imageUrl = result.secure_url || result.url;
+            if (!imageUrl) throw new AppError(502, "Image upload failed.");
+            res.status(200).json({ success: true, data: { imageUrl, publicId: result.public_id } });
         },
     };
 }

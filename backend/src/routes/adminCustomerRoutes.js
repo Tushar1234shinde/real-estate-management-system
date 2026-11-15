@@ -20,6 +20,7 @@ export function createAdminCustomerRouter({
 
     router.get("/customers", ...protect, asyncHandler(controller.listCustomers));
     router.post("/customers", ...protect, asyncHandler(controller.createCustomer));
+    router.post("/customers/import", ...protect, asyncHandler(controller.importCustomers));
     router.get("/customers/:customerId/assignment", ...protect, asyncHandler(controller.getCustomerAssignment));
     router.post("/customers/:customerId/assignment", ...protect, asyncHandler(controller.assignCustomer));
     router.patch("/customers/:customerId/whatsapp-consent", ...protect, asyncHandler(whatsAppController.recordConsent));

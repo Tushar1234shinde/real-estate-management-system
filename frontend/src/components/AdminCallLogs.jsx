@@ -240,23 +240,23 @@ export function AdminCallLogs({ role }) {
               <tbody>
                 {callLogs.map((log) => (
                   <tr key={log.id}>
-                    <td>
+                    <td data-label="Customer">
                       <strong>{log.customer?.fullName || "Unknown"}</strong>
                       <br />
                       <span className="muted">#{log.customerId}</span>
                     </td>
-                    <td>
+                    <td data-label="Employee">
                       <strong>{log.employee?.fullName || "Unknown"}</strong>
                     </td>
-                    <td>{enumLabel(log.employee?.role?.name || "")}</td>
-                    <td>
+                    <td data-label="Role">{enumLabel(log.employee?.role?.name || "")}</td>
+                    <td data-label="Outcome">
                       <span className={`status-badge`} style={{ color: getOutcomeColor(log.outcome) }}>
                         {enumLabel(log.outcome)}
                       </span>
                     </td>
-                    <td>{log.notes || "—"}</td>
-                    <td>{formatDateTime(log.calledAt)}</td>
-                    <td>{log.property?.title || "—"}</td>
+                    <td data-label="Notes">{log.notes || "—"}</td>
+                    <td data-label="Called At">{formatDateTime(log.calledAt)}</td>
+                    <td data-label="Property">{log.property?.title || "—"}</td>
                   </tr>
                 ))}
               </tbody>

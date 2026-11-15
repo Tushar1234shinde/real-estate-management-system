@@ -519,6 +519,31 @@ export function createInsideSalesController({ prismaClient = prisma } = {}) {
             });
         },
 
+        listOutsideSalesAgents: async (req, res) => {
+            const agents = await prismaClient.user.findMany({
+                where: {
+                    role: { name: "OUTSIDE_SALES" },
+                    isActive: true,
+                },
+                select: {
+                    id: true,
+                    fullName: true,
+                    email: true,
+                    phone: true,
+                },
+                orderBy: { fullName: "asc" },
+            });
+            res.status(200).json({
+                success: true,
+                data: {
+                    agents: agents.map((agent) => ({
+                        ...agent,
+                        phone: maskPhone(agent.phone),
+                    })),
+                },
+            });
+        },
+
         profile: async (req, res) => {
             const user = await prismaClient.user.findUnique({
                 where: { id: req.user.id },

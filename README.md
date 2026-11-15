@@ -51,6 +51,9 @@ in the background, prevent operating-system screenshots, or continuously block
 an employee who leaves a geofence. The companion-app architecture and delivery
 roadmap are in [documentation/mobile-operational-security.md](documentation/mobile-operational-security.md).
 
+The final requirements verification matrix is in
+[documentation/final-requirements-verification.md](documentation/final-requirements-verification.md).
+
 ## Project Structure
 
 ```text

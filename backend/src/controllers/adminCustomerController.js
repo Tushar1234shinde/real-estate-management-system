@@ -378,6 +378,99 @@ export function createAdminCustomerController({ prismaClient = prisma } = {}) {
             await createCustomerAssignment(prismaClient, req, res, customerId, insideSalesEmployeeId);
         },
 
+        importCustomers: async (req, res) => {
+            requireObjectBody(req.body);
+            if (!Array.isArray(req.body.customers) || req.body.customers.length === 0) {
+                throw new AppError(400, "customers must be a non-empty array.");
+            }
+            if (req.body.customers.length > 500) {
+                throw new AppError(400, "A maximum of 500 customers can be imported at once.");
+            }
+
+            const rawCustomers = req.body.customers;
+            const errors = [];
+            const parsedRows = [];
+            const seenPhones = new Set();
+
+            for (let i = 0; i < rawCustomers.length; i++) {
+                const row = rawCustomers[i];
+                const rowNum = i + 1;
+                try {
+                    if (!row || typeof row !== "object") {
+                        errors.push({ row: rowNum, error: "Row must be an object." });
+                        continue;
+                    }
+                    const fullName = parseFullName(row.fullName);
+                    const phone = parsePhone(row.phone);
+
+                    if (seenPhones.has(phone)) {
+                        errors.push({ row: rowNum, phone, error: `Duplicate phone number '${phone}' within file.` });
+                        continue;
+                    }
+                    seenPhones.add(phone);
+
+                    const email = row.email ? parseEmail(row.email) : null;
+                    const address = row.address ? parseAddress(row.address) : null;
+                    const interestStatus = row.interestStatus ? parseInterestStatus(row.interestStatus) : "PENDING";
+
+                    parsedRows.push({
+                        fullName,
+                        phone,
+                        email,
+                        address,
+                        status: "NEW",
+                        interestStatus,
+                    });
+                } catch (err) {
+                    errors.push({ row: rowNum, error: err.message || "Invalid row data." });
+                }
+            }
+
+            let existingInDb = [];
+            const phones = parsedRows.map((r) => r.phone);
+            if (phones.length > 0) {
+                existingInDb = await prismaClient.customer.findMany({
+                    where: { phone: { in: phones } },
+                    select: { phone: true },
+                });
+                for (const exist of existingInDb) {
+                    errors.push({ phone: exist.phone, error: `Phone number '${exist.phone}' already exists in database.` });
+                }
+            }
+
+            if (errors.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Validation failed for one or more customer rows.",
+                    data: {
+                        totalRows: rawCustomers.length,
+                        validRows: Math.max(0, parsedRows.length - existingInDb.length),
+                        failedRows: errors.length,
+                        errors,
+                    },
+                });
+            }
+
+            const inserted = await prismaClient.$transaction(
+                parsedRows.map((data) =>
+                    prismaClient.customer.create({
+                        data,
+                        select: customerSelect,
+                    })
+                )
+            );
+
+            res.status(201).json({
+                success: true,
+                message: `Successfully imported ${inserted.length} customers.`,
+                data: {
+                    totalRows: rawCustomers.length,
+                    importedCount: inserted.length,
+                    customers: inserted,
+                },
+            });
+        },
+
         assignCustomerFromBody: async (req, res) => {
             const { customerId, insideSalesEmployeeId } = parseExecutiveAssignmentBody(req.body);
             await createCustomerAssignment(prismaClient, req, res, customerId, insideSalesEmployeeId);
