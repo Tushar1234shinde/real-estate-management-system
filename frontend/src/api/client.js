@@ -1,6 +1,9 @@
 import { clearAuthToken, getAuthToken } from "./tokenStorage.js"
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/$/, "")
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? "http://localhost:5000" : "")
+).replace(/\/$/, "")
 
 export class ApiError extends Error {
   constructor(message, { status, data } = {}) {
@@ -12,7 +15,9 @@ export class ApiError extends Error {
 }
 
 function createUrl(path, query) {
-  const url = new URL(`${API_BASE_URL}${path}`)
+  const url = API_BASE_URL
+    ? new URL(`${API_BASE_URL}${path}`)
+    : new URL(path, window.location.origin)
 
   for (const [key, value] of Object.entries(query || {})) {
     if (value !== undefined && value !== null && value !== "") {
