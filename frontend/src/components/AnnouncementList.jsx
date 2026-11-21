@@ -82,17 +82,7 @@ export function AnnouncementList({ role, onEdit, onDelete, onStats, onRefresh })
   }
 
   return (
-    <div className="card announcement-list-card">
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">TEAM COMMUNICATION</span>
-          <h2>Announcements</h2>
-          <p className="muted">
-            View and acknowledge team announcements.
-          </p>
-        </div>
-      </div>
-
+    <div className="announcement-list-wrapper">
       {error && <div className="inline-warning" role="alert">{error}</div>}
       {success && <div className="toast-message" role="status">{success}</div>}
 
@@ -117,23 +107,27 @@ export function AnnouncementList({ role, onEdit, onDelete, onStats, onRefresh })
                 <div>
                   <div className="announcement-title">
                     <h3>{item.title}</h3>
-                    <span>
-                      {PRIORITY_LABELS[item.priority] || item.priority} ·
-                      {enumLabel(item.category || "")}
-                    </span>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                      <span className={`announcement-badge priority-${(item.priority || "NORMAL").toLowerCase()}`}>
+                        {PRIORITY_LABELS[item.priority] || item.priority}
+                      </span>
+                      {item.category && (
+                        <span className="announcement-badge">
+                          {enumLabel(item.category)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p>{item.content}</p>
                   <div className="announcement-meta">
-                    <span>
-                      {item.isRead
-                        ? `Read ${formatDateTime(item.readAt)}`
-                        : "Unread"}
+                    <span className={`status-badge ${item.isRead ? "status-active" : "status-scheduled"}`}>
+                      {item.isRead ? `Read ${formatDateTime(item.readAt)}` : "Unread"}
                     </span>
                     <span className="muted">
                       {formatDateTime(item.createdAt)}
                     </span>
                   </div>
-                  <div className="announcement-actions">
+                  <div className="table-actions announcement-actions">
                     {!item.isRead && (
                       <button
                         className="text-button"

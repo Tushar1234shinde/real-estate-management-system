@@ -528,11 +528,11 @@ function PropertyForm({ record, onSave, onClose }) {
 function Overview({ dashboard, profile }) {
   if (!dashboard) return <Loading label="Loading dashboard…" />;
   const cards = [
-    ["Employees", dashboard.employees?.total],
-    ["Customers", dashboard.customers?.total],
-    ["Properties", dashboard.properties?.total],
-    ["Unassigned customers", dashboard.customers?.unassigned],
-    ["Pending visit reviews", dashboard.visits?.byStatus?.PENDING_REVIEW || 0]
+    ["Employees", dashboard.employees?.total, Users, "blue"],
+    ["Customers", dashboard.customers?.total, Contact, "purple"],
+    ["Properties", dashboard.properties?.total, Building2, "cyan"],
+    ["Unassigned customers", dashboard.customers?.unassigned, UserPlus, "orange"],
+    ["Pending visit reviews", dashboard.visits?.byStatus?.PENDING_REVIEW || 0, Clock3, "green"]
   ];
   return (
     <>
@@ -544,9 +544,9 @@ function Overview({ dashboard, profile }) {
         </div>
       </div>
       <div className="stats-grid">
-        {cards.map(([label, value], i) => (
+        {cards.map(([label, value, Icon, colorClass]) => (
           <div className="stat-card" key={label}>
-            <div className={`stat-icon ${["blue", "purple", "cyan", "orange", "green"][i]}`}><Building2 /></div>
+            <div className={`stat-icon ${colorClass}`}><Icon /></div>
             <div className="stat-copy"><span>{label}</span><strong>{value ?? 0}</strong></div>
           </div>
         ))}

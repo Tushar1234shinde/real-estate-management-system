@@ -171,7 +171,7 @@ export function PropertyDocuments({
   }
 
   return (
-    <div className="card property-documents-card">
+    <div className="property-documents-card">
       <div className="documents-header">
         <div>
           <span className="eyebrow">PROPERTY DOCUMENTS</span>
@@ -203,9 +203,9 @@ export function PropertyDocuments({
       {success && <div className="toast-message" role="status">{success}</div>}
 
       {loading ? (
-        <div className="card empty-state"><h3>Loading documents…</h3></div>
+        <div className="empty-state"><h3>Loading documents…</h3></div>
       ) : documents.length === 0 ? (
-        <div className="card empty-state">
+        <div className="empty-state">
           <h3>No documents</h3>
           <p>
             {isManageable
@@ -258,32 +258,34 @@ export function PropertyDocuments({
                     <span className="doc-date">{formatDate(doc.uploadedAt)}</span>
                   </td>
                   <td data-label="Actions" className="row-actions">
-                    <button
-                      className="secondary-button"
-                      disabled={accessLoading[doc.id]}
-                      onClick={() => handleOpenDocument(doc)}
-                    >
-                      {accessLoading[doc.id] ? (
-                        <span className="loading-dots">…</span>
-                      ) : (
-                        <span>Open</span>
-                      )}
-                    </button>
-                    {isManageable && (
+                    <div className="table-actions">
                       <button
-                        className="text-button"
-                        disabled={deleting[doc.id]}
-                        onClick={() => handleDeleteDocument(doc)}
+                        className="secondary-button"
+                        disabled={accessLoading[doc.id]}
+                        onClick={() => handleOpenDocument(doc)}
                       >
-                        {deleting[doc.id] ? (
+                        {accessLoading[doc.id] ? (
                           <span className="loading-dots">…</span>
                         ) : (
-                          <>
-                            <Trash2 size={14} /> Delete
-                          </>
+                          <span>Open</span>
                         )}
                       </button>
-                    )}
+                      {isManageable && (
+                        <button
+                          className="text-button"
+                          disabled={deleting[doc.id]}
+                          onClick={() => handleDeleteDocument(doc)}
+                        >
+                          {deleting[doc.id] ? (
+                            <span className="loading-dots">…</span>
+                          ) : (
+                            <>
+                              <Trash2 size={14} /> Delete
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -45,16 +45,6 @@ function formatMimeLabel(mimeType) {
   return mimeType;
 }
 
-function getDeliveryStatusColor(status) {
-  switch (status) {
-    case "DELIVERED": return "var(--green)";
-    case "READ": return "var(--blue)";
-    case "SENT": return "var(--orange)";
-    case "FAILED": return "var(--red)";
-    case "PENDING": return "var(--muted)";
-    default: return "var(--ink)";
-  }
-}
 
 export function CustomerWhatsApp({
   customerId,
@@ -275,27 +265,13 @@ export function CustomerWhatsApp({
         </div>
         {effectiveInterest && (
           <span
-            className="status-badge"
-            style={{
-              background:
-                effectiveInterest === "INTERESTED"
-                  ? "#edfcf2"
-                  : effectiveInterest === "NOT_INTERESTED"
-                  ? "#fff1f2"
-                  : "#f1f5f9",
-              color:
-                effectiveInterest === "INTERESTED"
-                  ? "#087b3b"
-                  : effectiveInterest === "NOT_INTERESTED"
-                  ? "#be123c"
-                  : "#475569",
-              borderColor:
-                effectiveInterest === "INTERESTED"
-                  ? "#bde8cc"
-                  : effectiveInterest === "NOT_INTERESTED"
-                  ? "#fecdd3"
-                  : "#cbd5e1",
-            }}
+            className={`status-badge ${
+              effectiveInterest === "INTERESTED"
+                ? "status-interested"
+                : effectiveInterest === "NOT_INTERESTED"
+                ? "status-not-interested"
+                : "status-pending"
+            }`}
           >
             Interest: {enumLabel(effectiveInterest)}
           </span>
@@ -509,7 +485,12 @@ export function CustomerWhatsApp({
                       {msg.messageContent}
                     </td>
                     <td data-label="Status">
-                      <span className="status-badge" style={{ color: getDeliveryStatusColor(msg.deliveryStatus) }}>
+                      <span className={`status-badge ${
+                        msg.deliveryStatus === "DELIVERED" || msg.deliveryStatus === "READ" ? "status-completed" :
+                        msg.deliveryStatus === "FAILED" ? "status-rejected" :
+                        msg.deliveryStatus === "SENT" ? "status-rescheduled" :
+                        "status-pending"
+                      }`}>
                         {enumLabel(msg.deliveryStatus)}
                       </span>
                     </td>

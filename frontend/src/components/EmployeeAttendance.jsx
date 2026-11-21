@@ -29,18 +29,13 @@ function statusLabel(status) {
   }
 }
 
-function statusColor(status) {
-  switch (status) {
-    case "LOGGED_IN":
-      return "var(--green)";
-    case "LOGGED_OUT":
-      return "var(--red)";
-    case "AUTO_LOGGED_OUT":
-      return "var(--orange)";
-    default:
-      return "var(--muted)";
-  }
+function statusDotColor(status) {
+  if (status === "LOGGED_IN") return "var(--green)";
+  if (status === "LOGGED_OUT") return "var(--red)";
+  if (status === "AUTO_LOGGED_OUT") return "var(--orange)";
+  return "#cbd5e1";
 }
+
 
 export function EmployeeAttendance() {
   const [attendance, setAttendance] = useState(null);
@@ -232,17 +227,7 @@ export function EmployeeAttendance() {
     todayStatus === "LOGGED_IN" && !checking;
 
   return (
-    <div className="card attendance-card">
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">ATTENDANCE</span>
-          <h2>My Attendance</h2>
-          <p className="muted">
-            Record your work hours with location verification.
-          </p>
-        </div>
-      </div>
-
+    <div className="attendance-wrapper" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {error && <div className="inline-warning" role="alert">{error}</div>}
       {success && <div className="toast-message" role="status">{success}</div>}
 
@@ -253,7 +238,7 @@ export function EmployeeAttendance() {
         </div>
         <div className="status-display">
           <div className={`status-pill ${todayStatus ? "active" : "idle"}`}>
-            <span className="status-dot" style={{ backgroundColor: todayStatus ? statusColor(todayStatus) : "#cbd5e1" }}></span>
+            <span className="status-dot" style={{ backgroundColor: statusDotColor(todayStatus) }}></span>
             {todayStatus ? statusLabel(todayStatus) : "Not checked in"}
           </div>
           {attendance && (
@@ -407,7 +392,11 @@ export function EmployeeAttendance() {
                       {record.workingDurationMinutes !== null ? formatDuration(record.workingDurationMinutes) : "—"}
                     </td>
                     <td data-label="Status">
-                      <span className={`status-badge`} style={{ color: statusColor(record.status) }}>
+                      <span className={`status-badge ${
+                        record.status === "LOGGED_IN" ? "status-active" :
+                        record.status === "LOGGED_OUT" ? "status-inactive" :
+                        "status-pending"
+                      }`}>
                         {statusLabel(record.status)}
                       </span>
                     </td>

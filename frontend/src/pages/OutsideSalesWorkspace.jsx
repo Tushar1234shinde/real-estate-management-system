@@ -300,8 +300,8 @@ function VisitWorkflow({ schedule, onChange, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal" style={{ maxWidth: "620px", maxHeight: "90vh", overflowY: "auto" }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: "620px", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
         <button className="icon-button modal-close" onClick={onClose} aria-label="Close"><X /></button>
         <span className="eyebrow">VISIT WORKFLOW</span>
         <h2>{schedule.customer?.fullName || `Customer #${schedule.customerId}`}</h2>
@@ -542,9 +542,18 @@ function Schedules({ history = false }) {
                   </td>
                   <td data-label="Property">{schedule.property?.title || `Property #${schedule.propertyId}`}</td>
                   <td data-label="Scheduled">{formatDateTime(schedule.scheduledAt)}</td>
-                  <td data-label="Visit Status">{statusLabel(schedule.visit)}</td>
+                  <td data-label="Visit Status">
+                    <span className={`status-badge ${
+                      schedule.visit?.status === "COMPLETED" ? "status-completed" :
+                      schedule.visit?.status === "REJECTED" ? "status-rejected" :
+                      schedule.visit?.status === "PENDING_REVIEW" ? "status-pending" :
+                      "status-scheduled"
+                    }`}>
+                      {statusLabel(schedule.visit)}
+                    </span>
+                  </td>
                   <td data-label="Actions">
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div className="table-actions">
                       <button className="primary-button" onClick={() => setSelected(schedule)}>
                         {schedule.visit ? "Visit Evidence" : "Reached location"}
                       </button>
@@ -571,16 +580,16 @@ function Schedules({ history = false }) {
 
       {selected && <VisitWorkflow schedule={selected} onChange={changed} onClose={() => setSelected(null)} />}
       {documents && (
-        <div className="modal-backdrop">
-          <div className="modal">
+        <div className="modal-backdrop" onClick={() => setDocuments(null)}>
+          <div className="modal" style={{ maxWidth: "800px" }} onClick={(e) => e.stopPropagation()}>
             <button className="icon-button modal-close" onClick={() => setDocuments(null)} aria-label="Close"><X /></button>
             <PropertyDocuments propertyId={documents.propertyId} role="OUTSIDE_SALES" onClose={() => setDocuments(null)} />
           </div>
         </div>
       )}
       {calls && (
-        <div className="modal-backdrop">
-          <div className="modal">
+        <div className="modal-backdrop" onClick={() => setCalls(null)}>
+          <div className="modal" style={{ maxWidth: "700px" }} onClick={(e) => e.stopPropagation()}>
             <button className="icon-button modal-close" onClick={() => setCalls(null)} aria-label="Close"><X /></button>
             <CustomerCallLogs customerId={calls.customerId} role="OUTSIDE_SALES" />
           </div>
@@ -600,10 +609,13 @@ export default function OutsideSalesWorkspace() {
     : section === "attendance" ? <EmployeeAttendance />
     : section === "announcements" ? <AnnouncementList role="OUTSIDE_SALES" />
     : section === "profile" ? (
-      <section className="card data-page-card">
-        <span className="eyebrow">OUTSIDE SALES</span>
-        <h2>{user?.name}</h2>
-        <p>{user?.email}</p>
+      <section className="card entity-form" style={{ maxWidth: "600px" }}>
+        <div className="drawer-profile">
+          <div className="avatar large">{(user?.name || "U").slice(0, 1)}</div>
+          <h2>{user?.name || "Outside Sales Representative"}</h2>
+          <p>Outside Sales Representative</p>
+        </div>
+        <div className="detail-row"><div><span>Email</span><strong>{user?.email}</strong></div></div>
       </section>
     ) : <Schedules />
 

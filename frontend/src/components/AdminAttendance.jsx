@@ -115,30 +115,30 @@ export function AdminAttendance() {
               <div className="stat-icon"><Users size={22} /></div>
               <div className="stat-copy">
                 <span>Total Employees</span>
-                <strong>{summary?.summary?.totalEmployees ?? 0}</strong>
+                <strong>{summary?.totalEmployees ?? summary?.summary?.totalEmployees ?? 0}</strong>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon" style={{ color: "var(--green)" }}><CheckCircle size={22} /></div>
               <div className="stat-copy">
                 <span>Checked In</span>
-                <strong style={{ color: "var(--green)" }}>{summary?.summary?.checkedIn ?? 0}</strong>
+                <strong style={{ color: "var(--green)" }}>{summary?.checkedIn ?? summary?.summary?.checkedIn ?? 0}</strong>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon" style={{ color: "var(--red)" }}><XCircle size={22} /></div>
               <div className="stat-copy">
                 <span>Not Checked In</span>
-                <strong style={{ color: "var(--red)" }}>{summary?.summary?.notCheckedIn ?? 0}</strong>
+                <strong style={{ color: "var(--red)" }}>{summary?.notCheckedIn ?? summary?.summary?.notCheckedIn ?? 0}</strong>
               </div>
             </div>
           </div>
         )}
 
-        {summary && summary.summary?.byStatus && (
+        {summary && (summary.byStatus || summary.summary?.byStatus) && (
           <div className="by-status">
             <span className="muted">By status:</span>
-            {Object.entries(summary.summary.byStatus).map(([status, count]) => (
+            {Object.entries(summary.byStatus || summary.summary?.byStatus || {}).map(([status, count]) => (
               <span
                 key={status}
                 className={`status-badge ${

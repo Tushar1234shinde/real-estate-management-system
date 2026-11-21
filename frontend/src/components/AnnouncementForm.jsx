@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Megaphone, X, Clock } from "lucide-react";
+import { Megaphone, Clock } from "lucide-react";
 import { announcementsApi } from "../api/announcements.js";
 import { enumLabel } from "../utils/apiMappers.js";
 
@@ -72,41 +72,31 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
   }
 
   return (
-    <div className="card announcement-form-card">
-      <div className="form-header">
-        <button className="icon-button" onClick={onClose}>
-          <X size={20} />
-        </button>
-        <div>
-          <span className="eyebrow">
-            {isEdit ? "EDIT ANNOUNCEMENT" : "CREATE ANNOUNCEMENT"}
-          </span>
-          <h2>{isEdit ? "Edit Announcement" : "New Announcement"}</h2>
-        </div>
-      </div>
-
+    <div className="announcement-form-wrapper">
       {error && <div className="inline-warning" role="alert">{error}</div>}
       {success && <div className="toast-message" role="status">{success}</div>}
 
-      <form className="announcement-form" onSubmit={submit}>
+      <form className="entity-form announcement-form" onSubmit={submit}>
         <div className="form-grid">
-          <label className="field-label">
+          <label className="field-label full">
             Title <span className="muted">*</span>
             <input
               name="title"
               required
               maxLength="160"
+              placeholder="Announcement title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
-          <label className="field-label">
+          <label className="field-label full">
             Content <span className="muted">*</span>
             <textarea
               name="content"
               required
               maxLength="10000"
-              rows="6"
+              rows="5"
+              placeholder="Write the announcement body here…"
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
@@ -117,6 +107,7 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
               name="category"
               required
               maxLength="80"
+              placeholder="e.g. Policy Update, Holiday, HR"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             />
@@ -129,14 +120,12 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
               onChange={(e) => setPriority(e.target.value)}
             >
               {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {enumLabel(p)}
-                </option>
+                <option key={p} value={p}>{enumLabel(p)}</option>
               ))}
             </select>
           </label>
-          <label className="field-label">
-            Expiry date (optional)
+          <label className="field-label full">
+            Expiry date <span className="muted">(optional)</span>
             <input
               name="expiresAt"
               type="datetime-local"
@@ -144,8 +133,8 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
               onChange={(e) => setExpiresAt(e.target.value)}
             />
           </label>
-          <label className="field-label">
-            Target roles
+          <div className="field-label full" style={{ gap: 8 }}>
+            <span>Target roles</span>
             <div className="role-chips">
               {ROLES.map((role) => (
                 <button
@@ -157,30 +146,25 @@ export function AnnouncementForm({ announcement, onClose, onSave }) {
                   {enumLabel(role)}
                 </button>
               ))}
-              <span className="muted" style={{ fontSize: "11px" }}>
-                Leave empty for all employees
-              </span>
             </div>
-          </label>
-          <label className="field-label" style={{ display: "flex", alignItems: "center", gap: 8, minHeight: "auto", padding: 0 }}>
+            <span className="role-chip-hint">Leave all unselected to target all employees</span>
+          </div>
+          <label className="field-label full" style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10, minHeight: "auto", paddingTop: 4, paddingBottom: 4 }}>
             <input
               name="isPublished"
               type="checkbox"
+              style={{ width: 15, height: 15, accentColor: "var(--teal)", flexShrink: 0 }}
               checked={isPublished}
               onChange={(e) => setIsPublished(e.target.checked)}
             />
-            Publish immediately
+            <span>Publish immediately</span>
           </label>
         </div>
         <div className="form-footer">
           <button type="button" className="secondary-button" onClick={onClose}>
             Cancel
           </button>
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={loading}
-          >
+          <button type="submit" className="primary-button" disabled={loading}>
             {loading ? (
               <Clock size={16} />
             ) : (

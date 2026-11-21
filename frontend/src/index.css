@@ -955,3 +955,156 @@ td span {
 }
 
 
+
+/* ============================================================
+   DESIGN SYSTEM EXTENSIONS — PropLattice UI/UX Polish Pass
+   ============================================================ */
+
+/* Danger button */
+.danger-button {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 0 18px; min-height: 40px; border-radius: 9px;
+  border: 1.5px solid var(--red); background: var(--red);
+  color: white; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.danger-button:hover { opacity: .88; }
+.danger-button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Form utilities */
+.form-section { margin-bottom: 24px; }
+.form-section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  color: #8a95a6; text-transform: uppercase; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid #eef1f5;
+}
+.form-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+@media (max-width: 540px) { .form-row { grid-template-columns: 1fr; } }
+
+.required-mark::after { content: " *"; color: var(--red); }
+.field-hint { font-size: 11px; color: #8a95a6; margin-top: 3px; display: block; }
+.form-error { font-size: 11px; color: var(--red); margin-top: 4px; display: block; }
+
+/* Role chip toggles (AnnouncementForm target roles) */
+.role-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0 4px;
+}
+.role-chip {
+  display: inline-flex; align-items: center; padding: 6px 14px;
+  border: 1.5px solid #d1d9e6; border-radius: 20px;
+  background: white; color: #4d5b70; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.role-chip:hover { border-color: var(--teal); color: var(--teal); }
+.role-chip-selected {
+  border-color: var(--teal); background: rgba(23,154,199,.1);
+  color: var(--teal);
+}
+.role-chip-hint { font-size: 11px; color: #8a95a6; padding-top: 4px; display: block; }
+
+/* Announcement form card */
+.announcement-form-card { padding: 28px; }
+.announcement-form-card .form-header {
+  display: flex; align-items: flex-start; gap: 16px;
+  margin-bottom: 24px; padding-bottom: 20px;
+  border-bottom: 1px solid #eef1f5;
+}
+.announcement-form-card .form-header > button { flex-shrink: 0; }
+.announcement-form-card .form-header > div { flex: 1; }
+.announcement-form .form-grid { grid-template-columns: 1fr; }
+
+/* Visit review */
+.visit-review-container { display: flex; flex-direction: column; gap: 0; }
+.evidence-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px;
+  font-weight: 600; background: #f0f3f7; color: #4d5b70;
+}
+.evidence-pill.selfie { background: #edf6ff; color: var(--blue); }
+.evidence-pill.audio { background: #f0fdf4; color: var(--green); }
+
+/* Admin Office Locations */
+.admin-office-locations-card { display: flex; flex-direction: column; gap: 0; }
+
+/* GPS status indicator in EmployeeAttendance */
+.geo-status.granted { color: var(--green); font-weight: 600; }
+.geo-status.denied { color: var(--red); font-weight: 600; }
+.geo-status.requesting { color: var(--orange); }
+.geo-status.unknown { color: #8a95a6; }
+
+/* Status badges for visit verification */
+.status-badge.status-verified { background: #ecfdf5; color: #059669; }
+.status-badge.status-failed-verification { background: #fef2f2; color: #dc2626; }
+
+/* CustomerCallLogs outcome badges using CSS classes */
+.status-badge.status-interested-outcome { background: #ecfdf5; color: #059669; }
+.status-badge.status-not-interested-outcome { background: #fef2f2; color: #dc2626; }
+.status-badge.status-call-back-outcome { background: #eff6ff; color: #2563eb; }
+.status-badge.status-no-answer-outcome { background: #fff7ed; color: #ea580c; }
+.status-badge.status-invalid-outcome { background: #f8fafc; color: #64748b; }
+
+/* Upload trigger button with native file input */
+.upload-trigger { position: relative; overflow: hidden; }
+.upload-trigger input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0;
+}
+
+/* Announcement card in list */
+.announcement-item {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 20px; border-radius: 10px;
+  border: 1px solid #eef1f5; background: white;
+  transition: box-shadow .15s;
+}
+.announcement-item:hover { box-shadow: 0 2px 10px rgba(10,20,40,.07); }
+.announcement-item-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px;
+}
+.announcement-item-title { font-size: 14px; font-weight: 700; color: var(--ink); margin: 0; }
+.announcement-item-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.announcement-badge {
+  display: inline-flex; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  background: #f0f3f7; color: #4d5b70;
+}
+.announcement-badge.priority-high { background: #fef2f2; color: #dc2626; }
+.announcement-badge.priority-normal { background: #eff6ff; color: #2563eb; }
+.announcement-badge.priority-low { background: #f0fdf4; color: #059669; }
+
+/* Table vertical alignment */
+.table-scroll table td { vertical-align: middle; }
+
+/* Text utilities */
+.text-nowrap { white-space: nowrap; }
+.text-muted { color: #64748b; font-size: 11px; }
+
+/* Responsive visit review modal */
+@media (max-width: 700px) {
+  .modal-card { max-width: 100% !important; margin: 0 12px; }
+  .visit-review-container .page-heading { flex-direction: column; align-items: flex-start; }
+}
+
+/* AnnouncementForm inside Dialog — no extra card frame */
+.announcement-form-wrapper { }
+.announcement-form-wrapper .entity-form { padding: 24px; }
+.announcement-form .form-grid { grid-template-columns: 1fr; gap: 16px; }
+.announcement-form .form-grid .form-row { grid-template-columns: 1fr 1fr; }
+@media (max-width: 540px) { .announcement-form .form-grid .form-row { grid-template-columns: 1fr; } }
+
+/* Evidence block in visit review modal */
+.modal-body-pad { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.evidence-block {
+  border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 14px; background: #f8fafc;
+}
+.evidence-block-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.modal-footer-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line);
+}

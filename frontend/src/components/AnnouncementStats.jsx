@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Megaphone, X, Clock } from "lucide-react";
+import { Megaphone, Clock, CheckCircle2, Users } from "lucide-react";
 import { adminAnnouncementsApi } from "../api/announcements.js";
 import { formatDateTime } from "../utils/apiMappers.js";
 
@@ -44,7 +44,7 @@ export function AnnouncementStats({ announcementId, onClose }) {
 
   if (loading) {
     return (
-      <div className="card announcement-stats-card">
+      <div className="announcement-stats-wrapper">
         <div className="empty-state"><h3>Loading statistics…</h3></div>
       </div>
     );
@@ -52,7 +52,7 @@ export function AnnouncementStats({ announcementId, onClose }) {
 
   if (error) {
     return (
-      <div className="card announcement-stats-card">
+      <div className="announcement-stats-wrapper">
         <div className="empty-state">
           <h3>Unable to load statistics</h3>
           <p>{error}</p>
@@ -63,41 +63,39 @@ export function AnnouncementStats({ announcementId, onClose }) {
 
   if (!stats) {
     return (
-      <div className="card announcement-stats-card">
+      <div className="announcement-stats-wrapper">
         <div className="empty-state"><h3>Statistics not available</h3></div>
       </div>
     );
   }
 
   return (
-    <div className="card announcement-stats-card">
-      <div className="stats-header">
-        <div>
-          <span className="eyebrow">READ STATISTICS</span>
-          <h2>Announcement Reads</h2>
-          <p className="muted">{stats.announcement.title}</p>
-        </div>
-        <button className="icon-button" onClick={onClose}>
-          <X size={20} />
-        </button>
-      </div>
+    <div className="announcement-stats-wrapper" style={{ padding: "20px" }}>
+      {stats.announcement?.title && (
+        <p className="muted" style={{ margin: "0 0 16px", fontWeight: "600" }}>
+          {stats.announcement.title}
+        </p>
+      )}
 
       {error && <div className="inline-warning" role="alert">{error}</div>}
 
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ marginBottom: "20px" }}>
         <div className="stat-card">
+          <div className="stat-icon" style={{ color: "var(--green)" }}><CheckCircle2 size={22} /></div>
           <div className="stat-copy">
             <span>Read Count</span>
             <strong style={{ color: "var(--green)" }}>{stats.readCount}</strong>
           </div>
         </div>
         <div className="stat-card">
+          <div className="stat-icon" style={{ color: "var(--red)" }}><Clock size={22} /></div>
           <div className="stat-copy">
             <span>Unread Count</span>
             <strong style={{ color: "var(--red)" }}>{stats.unreadCount}</strong>
           </div>
         </div>
         <div className="stat-card">
+          <div className="stat-icon"><Users size={22} /></div>
           <div className="stat-copy">
             <span>Eligible Employees</span>
             <strong>{stats.eligibleEmployees}</strong>
@@ -105,7 +103,7 @@ export function AnnouncementStats({ announcementId, onClose }) {
         </div>
       </div>
 
-      <div className="stats-actions">
+      <div className="table-actions" style={{ justifyContent: "flex-end" }}>
         <button
           className="secondary-button"
           disabled={refreshing}

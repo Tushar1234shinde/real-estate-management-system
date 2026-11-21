@@ -69,14 +69,14 @@ export function CustomerCallLogs({ customerId, role }) {
 
   if (loading) {
     return (
-      <div className="card call-logs-card">
+      <div className="call-logs-card">
         <div className="empty-state"><h3>Loading call logs…</h3></div>
       </div>
     );
   }
 
   return (
-    <div className="card call-logs-card">
+    <div className="call-logs-card">
       <div className="call-logs-header">
         <span className="eyebrow">CALL LOGS</span>
         <h3>Call History</h3>
@@ -153,7 +153,14 @@ export function CustomerCallLogs({ customerId, role }) {
                 {callLogs.map((log) => (
                   <tr key={log.id}>
                     <td data-label="Outcome">
-                      <span className={`status-badge`} style={{ color: getOutcomeColor(log.outcome) }}>
+                      <span className={`status-badge ${
+                        log.outcome === "INTERESTED" ? "status-interested" :
+                        log.outcome === "NOT_INTERESTED" ? "status-not-interested" :
+                        log.outcome === "CALL_BACK" ? "status-call-back" :
+                        log.outcome === "NO_ANSWER" ? "status-no-answer" :
+                        log.outcome === "INVALID_NUMBER" ? "status-invalid-number" :
+                        "status-pending"
+                      }`}>
                         {enumLabel(log.outcome)}
                       </span>
                     </td>
@@ -169,21 +176,4 @@ export function CustomerCallLogs({ customerId, role }) {
       </section>
     </div>
   );
-}
-
-function getOutcomeColor(outcome) {
-  switch (outcome) {
-    case "INTERESTED":
-      return "var(--green)";
-    case "NOT_INTERESTED":
-      return "var(--red)";
-    case "CALL_BACK":
-      return "var(--blue)";
-    case "NO_ANSWER":
-      return "var(--orange)";
-    case "INVALID_NUMBER":
-      return "var(--muted)";
-    default:
-      return "var(--ink)";
-  }
 }

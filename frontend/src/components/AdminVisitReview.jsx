@@ -175,60 +175,31 @@ export function AdminVisitReview({ onReviewComplete }) {
                         <span>{schedule.outsideSalesEmployee?.email || "—"}</span>
                       </td>
                       <td data-label="GPS Verification">
-                        <span
-                          className={`status ${
-                            visit.verificationResult === "PASSED"
-                              ? "success"
-                              : visit.verificationResult === "FAILED"
-                              ? "danger"
-                              : "neutral"
-                          }`}
-                        >
-                          <i />
-                          {visit.verificationResult === "PASSED"
-                            ? "Verified"
-                            : visit.verificationResult === "FAILED"
-                            ? "Failed"
-                            : "Pending"}
+                        <span className={`status-badge ${
+                          visit.verificationResult === "PASSED" ? "status-active" :
+                          visit.verificationResult === "FAILED" ? "status-rejected" :
+                          "status-pending"
+                        }`}>
+                          {visit.verificationResult === "PASSED" ? "Verified" :
+                           visit.verificationResult === "FAILED" ? "Failed" : "Pending"}
                         </span>
                       </td>
                       <td data-label="Evidence">
-                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                          {selfie && (
-                            <span title="Selfie uploaded" style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--navy)" }}>
-                              <Camera size={15} /> Selfie
-                            </span>
-                          )}
-                          {audio && (
-                            <span title="Audio recorded" style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "var(--blue)" }}>
-                              <Mic size={15} /> Audio
-                            </span>
-                          )}
-                          {!selfie && !audio && <span className="muted">None</span>}
+                        <div className="table-actions">
+                          {selfie && <span className="evidence-pill selfie"><Camera size={13} /> Selfie</span>}
+                          {audio && <span className="evidence-pill audio"><Mic size={13} /> Audio</span>}
+                          {!selfie && !audio && <span className="text-muted">None</span>}
                         </div>
                       </td>
                       <td data-label="Actions">
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            className="secondary-button"
-                            onClick={() => setSelectedVisit(visit)}
-                          >
+                        <div className="table-actions">
+                          <button className="secondary-button" onClick={() => setSelectedVisit(visit)}>
                             Review Details
                           </button>
-                          <button
-                            className="primary-button"
-                            style={{ minHeight: "36px", padding: "0 12px" }}
-                            disabled={submitting}
-                            onClick={() => handleApprove(visit.id)}
-                          >
+                          <button className="primary-button" disabled={submitting} onClick={() => handleApprove(visit.id)}>
                             <Check size={14} /> Approve
                           </button>
-                          <button
-                            className="secondary-button"
-                            style={{ minHeight: "36px", padding: "0 12px", color: "var(--red)", borderColor: "var(--red)" }}
-                            disabled={submitting}
-                            onClick={() => setRejectingVisit(visit)}
-                          >
+                          <button className="danger-button" disabled={submitting} onClick={() => setRejectingVisit(visit)}>
                             <X size={14} /> Reject
                           </button>
                         </div>
@@ -454,17 +425,12 @@ export function AdminVisitReview({ onReviewComplete }) {
                 />
               </label>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => setRejectingVisit(null)}
-                >
+                <button type="button" className="secondary-button" onClick={() => setRejectingVisit(null)}>
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="primary-button"
-                  style={{ background: "var(--red)" }}
+                  className="danger-button"
                   disabled={submitting || !rejectionReason.trim()}
                 >
                   Confirm Rejection

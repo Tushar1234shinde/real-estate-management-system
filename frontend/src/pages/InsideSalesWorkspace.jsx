@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { NavLink, useNavigate, useParams } from "react-router"
-import { CalendarDays, Contact, FileText, Home, Menu, Phone, RefreshCw, UserCheck, Users, X, Plus } from "lucide-react"
+import { CalendarDays, Contact, FileText, Home, Menu, Phone, RefreshCw, UserCheck, Users, X, Plus, TrendingUp, UserX } from "lucide-react"
 import { useAuth } from "../auth/AuthContext.jsx"
 import { insideSalesApi } from "../api/insideSales.js"
 import { enumLabel, formatDateTime } from "../utils/apiMappers.js"
@@ -255,8 +255,8 @@ function CustomerDetails({ customer, onClose, refresh, onSchedule, onWhatsApp })
   }
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal customer-drawer">
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal customer-drawer" onClick={(e) => e.stopPropagation()}>
         <button className="icon-button modal-close" onClick={onClose} aria-label="Close">
           <X />
         </button>
@@ -332,7 +332,40 @@ function Properties() {
   const [state, setState] = useState({ loading: true, error: "", properties: [] }); const [selected, setSelected] = useState(null)
   const load = useCallback(async () => { setState(s => ({ ...s, loading: true, error: "" })); try { const data = await insideSalesApi.listAvailableProperties({ page: 1, pageSize: 100 }); setState({ loading: false, error: "", properties: data.properties || [] }) } catch (e) { setState({ loading: false, error: messageFor(e), properties: [] }) } }, [])
   useEffect(() => { load() }, [load]); if (state.loading) return <Loading label="Loading available properties…" />; if (state.error) return <Failure message={state.error} retry={load} />
-  return <><section className="card data-page-card"><div className="table-scroll"><table><thead><tr><th>Property</th><th>Location</th><th>Price</th><th /></tr></thead><tbody>{state.properties.map(property => <tr key={property.id}><td><strong>{property.title}</strong><span>{property.status}</span></td><td>{property.location}</td><td>{property.price}</td><td><button className="secondary-button" onClick={() => setSelected(property)}>Documents</button></td></tr>)}</tbody></table></div>{!state.properties.length && <Empty title="No available properties" text="There are no available properties right now." />}</section>{selected && <div className="modal-backdrop"><div className="modal"><button className="icon-button modal-close" onClick={() => setSelected(null)} aria-label="Close"><X /></button><PropertyDocuments propertyId={selected.id} role="INSIDE_SALES" onClose={() => setSelected(null)} /></div></div>}</>
+  return (
+    <>
+      <section className="card data-page-card">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Property</th><th>Location</th><th>Price</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {state.properties.map(property => (
+                <tr key={property.id}>
+                  <td data-label="Property"><strong>{property.title}</strong><span className="status-badge status-available">{property.status}</span></td>
+                  <td data-label="Location">{property.location}</td>
+                  <td data-label="Price">{property.price}</td>
+                  <td data-label="Actions">
+                    <button className="secondary-button" onClick={() => setSelected(property)}>Documents</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!state.properties.length && <Empty title="No available properties" text="There are no available properties right now." />}
+      </section>
+      {selected && (
+        <div className="modal-backdrop" onClick={() => setSelected(null)}>
+          <div className="modal" style={{ maxWidth: "800px" }} onClick={(e) => e.stopPropagation()}>
+            <button className="icon-button modal-close" onClick={() => setSelected(null)} aria-label="Close"><X /></button>
+            <PropertyDocuments propertyId={selected.id} role="INSIDE_SALES" onClose={() => setSelected(null)} />
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function Schedules({ initialCustomer, onClearInitialCustomer }) {
@@ -578,13 +611,25 @@ function Schedules({ initialCustomer, onClearInitialCustomer }) {
 
 function Overview({ dashboard }) {
   const metrics = [
-    ["Assigned customers", dashboard?.assignedCustomers],
-    ["Interested customers", dashboard?.interestStatuses?.INTERESTED],
-    ["Not interested", dashboard?.interestStatuses?.NOT_INTERESTED],
-    ["Call outcomes", dashboard?.callActivity?.total],
-    ["Property visits", dashboard?.visitSchedules?.total],
-  ]
-  return <section className="metric-grid">{metrics.map(([label, value]) => <article className="metric-card" key={label}><span>{label}</span><strong>{Number.isFinite(value) ? value : 0}</strong></article>)}</section>
+    ["Assigned customers", dashboard?.assignedCustomers, Users, "blue"],
+    ["Interested customers", dashboard?.interestStatuses?.INTERESTED, TrendingUp, "green"],
+    ["Not interested", dashboard?.interestStatuses?.NOT_INTERESTED, UserX, "orange"],
+    ["Call outcomes", dashboard?.callActivity?.total, Phone, "purple"],
+    ["Property visits", dashboard?.visitSchedules?.total, CalendarDays, "cyan"],
+  ];
+  return (
+    <div className="stats-grid">
+      {metrics.map(([label, value, Icon, colorClass]) => (
+        <div className="stat-card" key={label}>
+          <div className={`stat-icon ${colorClass}`}><Icon size={22} /></div>
+          <div className="stat-copy">
+            <span>{label}</span>
+            <strong>{Number.isFinite(value) ? value : 0}</strong>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function InsideSalesWorkspace() {
@@ -664,11 +709,14 @@ export default function InsideSalesWorkspace() {
     content = <Customers onOpen={setSelected} onWhatsApp={handleOpenWhatsApp} />;
   } else if (section === "profile") {
     content = loading ? <Loading label="Loading profile…" /> : error ? <Failure message={error} retry={loadOverview} /> : (
-      <section className="card data-page-card">
-        <span className="eyebrow">INSIDE SALES</span>
-        <h2>{profile?.fullName || user?.name}</h2>
-        <p>{profile?.email}</p>
-        <p>{profile?.phone || "No phone number"}</p>
+      <section className="card entity-form" style={{ maxWidth: "600px" }}>
+        <div className="drawer-profile">
+          <div className="avatar large">{(profile?.fullName || user?.name || "U").slice(0, 1)}</div>
+          <h2>{profile?.fullName || user?.name}</h2>
+          <p>Inside Sales Representative</p>
+        </div>
+        <div className="detail-row"><div><span>Email</span><strong>{profile?.email || user?.email}</strong></div></div>
+        <div className="detail-row"><div><span>Phone</span><strong>{profile?.phone || "Not provided"}</strong></div></div>
       </section>
     );
   } else {
@@ -677,13 +725,15 @@ export default function InsideSalesWorkspace() {
 
   return (
     <Shell section={section} profile={profile}>
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">INSIDE SALES</span>
-          <h1>{title}</h1>
-          <p>{section === "overview" ? "Live activity from your assigned customers and schedules." : "Live records from the management API."}</p>
+      {section !== "visits" && section !== "assignments" && (
+        <div className="page-heading">
+          <div>
+            <span className="eyebrow">INSIDE SALES</span>
+            <h1>{title}</h1>
+            <p>{section === "overview" ? "Live activity from your assigned customers and schedules." : "Live records from the management API."}</p>
+          </div>
         </div>
-      </div>
+      )}
       {content}
       {selected && (
         <CustomerDetails
@@ -698,8 +748,8 @@ export default function InsideSalesWorkspace() {
         />
       )}
       {whatsappState && (
-        <div className="modal-backdrop">
-          <div className="modal whatsapp-modal">
+        <div className="modal-backdrop" onClick={() => setWhatsappState(null)}>
+          <div className="modal whatsapp-modal" onClick={(e) => e.stopPropagation()}>
             <button
               className="icon-button modal-close"
               onClick={() => setWhatsappState(null)}

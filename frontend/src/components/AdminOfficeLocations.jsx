@@ -6,9 +6,6 @@ function messageFor(error) {
   return error?.message || "The request could not be completed.";
 }
 
-function statusColor(isActive) {
-  return isActive ? "var(--green)" : "var(--red)";
-}
 
 export function AdminOfficeLocations() {
   const [officeLocations, setOfficeLocations] = useState([]);
@@ -171,17 +168,19 @@ export function AdminOfficeLocations() {
                   <td data-label="Coordinates">{office.latitude}, {office.longitude}</td>
                   <td data-label="Radius (m)">{office.allowedRadiusMeters}</td>
                   <td data-label="Status">
-                    <span className={`status-badge`} style={{ color: statusColor(office.isActive) }}>
+                    <span className={`status-badge ${office.isActive ? "status-active" : "status-inactive"}`}>
                       {office.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td data-label="Actions">
-                    <button className="secondary-button" onClick={() => openEditModal(office)}>
-                      <Save size={16} /> Edit
-                    </button> {" "}
-                    <button className="text-button" onClick={() => handleToggle(office)}>
-                      {office.isActive ? "Deactivate" : "Activate"}
-                    </button>
+                    <div className="table-actions">
+                      <button className="secondary-button" onClick={() => openEditModal(office)}>
+                        <Save size={16} /> Edit
+                      </button>
+                      <button className="text-button" onClick={() => handleToggle(office)}>
+                        {office.isActive ? "Deactivate" : "Activate"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -205,8 +204,8 @@ export function AdminOfficeLocations() {
       )}
 
       {open && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <span>OFFICE LOCATION</span>
